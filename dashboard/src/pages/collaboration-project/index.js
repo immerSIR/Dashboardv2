@@ -1,0 +1,1 @@
+export { CollaborationProject } from './CollaborationProject';

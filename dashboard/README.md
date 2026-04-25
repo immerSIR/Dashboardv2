@@ -1,16 +1,54 @@
-# React + Vite
+# Dashboard Map Action Mali
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Dashboard de gestion des actions humanitaires et environnementales au Mali.
 
-Currently, two official plugins are available:
+## 🚀 Installation
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+```
 
-## React Compiler
+## ⚙️ Configuration
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Variables d'environnement
 
-## Expanding the ESLint configuration
+Créez un fichier `.env` à la racine du projet (voir `.env.example`) :
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```env
+REACT_APP_MAPBOX_TOKEN=votre_token_mapbox_ici
+```
+
+**Obtenir un token Mapbox :**
+1. Créez un compte gratuit sur [https://account.mapbox.com/](https://account.mapbox.com/)
+2. Allez dans la section "Access tokens"
+3. Copiez votre token public (commence par `pk.`)
+4. Collez-le dans votre fichier `.env`
+
+⚠️ **Important** : Ne commitez JAMAIS votre fichier `.env` avec un vrai token !
+
+## 🏃 Démarrage
+
+```bash
+npm run dev
+```
+
+L'application sera accessible sur `http://localhost:5173`
+
+## 📦 Build
+
+```bash
+npm run build
+```
+
+## 🛠️ Technologies
+
+- React 18
+- Vite
+- Mapbox GL JS
+- React Map GL
+- Iconsax React
+- React DatePicker
+
+## 📄 License
+
+Propriétaire - Map Action Mali

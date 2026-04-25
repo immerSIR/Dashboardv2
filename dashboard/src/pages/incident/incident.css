@@ -1,0 +1,234 @@
+/* ============================================
+   INCIDENT PAGE
+   ============================================ */
+
+.incident-page {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--color-background);
+}
+
+.incident-page-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Workspace 3 colonnes - chaque colonne est indépendante */
+.incident-workspace {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.placeholder {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body);
+  text-align: center;
+  padding: var(--spacing-6);
+}
+
+/* Bottom nav caché par défaut (desktop) */
+.mobile-bottom-nav {
+  display: none;
+}
+
+/* ============================================
+   MOBILE (< 1024px) - Layout à onglets
+   ============================================ */
+@media (max-width: 1023px) {
+  /* Toutes les colonnes occupent 100% de la largeur */
+  .incident-workspace .incident-queue,
+  .incident-workspace .incident-detail,
+  .incident-workspace .online-now {
+    width: 100%;
+    flex: 1;
+    border: none;
+  }
+
+  /* Par défaut (pas de tab) : on voit la liste */
+  .incident-workspace .incident-detail,
+  .incident-workspace .online-now {
+    display: none;
+  }
+
+  /* ---- Tab "detail" : affiche le haut du détail (header + map + assets) ---- */
+  .incident-workspace.mobile-tab-detail .incident-queue,
+  .incident-workspace.mobile-tab-detail .online-now {
+    display: none;
+  }
+
+  .incident-workspace.mobile-tab-detail .incident-detail {
+    display: flex;
+  }
+
+  /* En mode détail : masquer le feed (il est dans son propre tab) */
+  .incident-workspace.mobile-tab-detail .detail-feed {
+    display: none;
+  }
+
+  /* Le top prend toute la hauteur */
+  .incident-workspace.mobile-tab-detail .incident-detail-top {
+    max-height: none;
+    flex: 1;
+  }
+
+  /* ---- Tab "chat" : affiche uniquement le feed ---- */
+  .incident-workspace.mobile-tab-chat .incident-queue,
+  .incident-workspace.mobile-tab-chat .online-now {
+    display: none;
+  }
+
+  .incident-workspace.mobile-tab-chat .incident-detail {
+    display: flex;
+  }
+
+  /* En mode chat : masquer header + top, afficher le feed en plein écran */
+  .incident-workspace.mobile-tab-chat .detail-header,
+  .incident-workspace.mobile-tab-chat .incident-detail-top {
+    display: none;
+  }
+
+  .incident-workspace.mobile-tab-chat .detail-feed {
+    display: flex;
+    flex: 1;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  /* ---- Tab "online" : affiche uniquement la liste des membres ---- */
+  .incident-workspace.mobile-tab-online .incident-queue,
+  .incident-workspace.mobile-tab-online .incident-detail {
+    display: none;
+  }
+
+  .incident-workspace.mobile-tab-online .online-now {
+    display: flex;
+  }
+
+  /* Bouton retour visible sur mobile (uniquement en mode détail) */
+  .detail-back-btn {
+    display: inline-flex;
+  }
+
+  /* Laisser de la place pour la bottom nav quand elle est visible */
+  .incident-workspace.mobile-tab-detail,
+  .incident-workspace.mobile-tab-chat,
+  .incident-workspace.mobile-tab-online {
+    padding-bottom: 64px;
+  }
+
+  /* ============================================
+     BOTTOM NAV BAR (mobile)
+     ============================================ */
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background-color: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+    z-index: 900;
+    align-items: stretch;
+    justify-content: space-around;
+    padding: 0 var(--spacing-2);
+  }
+
+  .bottom-nav-btn {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--color-text-muted);
+    padding: var(--spacing-2);
+    font-family: var(--font-family);
+    transition: color 0.2s ease;
+  }
+
+  .bottom-nav-btn.active {
+    color: var(--color-primary);
+  }
+
+  .bottom-nav-btn:active {
+    transform: scale(0.96);
+  }
+
+  .bottom-nav-label {
+    font-size: 11px;
+    font-weight: var(--font-weight-medium);
+  }
+
+  .bottom-nav-btn.active .bottom-nav-label {
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .bottom-nav-badge {
+    position: absolute;
+    top: 6px;
+    right: calc(50% - 20px);
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: var(--radius-full);
+    background-color: var(--color-danger);
+    color: var(--color-surface);
+    font-size: 10px;
+    font-weight: var(--font-weight-bold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--color-surface);
+  }
+
+  .bottom-nav-badge.success {
+    background-color: var(--color-success);
+  }
+}
+
+/* Desktop : cacher le bouton retour et la bottom nav */
+@media (min-width: 1024px) {
+  .detail-back-btn {
+    display: none;
+  }
+  .mobile-bottom-nav {
+    display: none;
+  }
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
