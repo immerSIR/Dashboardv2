@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Element4, People, Danger, ProfileCircle, Clock, Briefcase, MessageQuestion } from 'iconsax-react';
+import { Element4, People, Danger, ProfileCircle, Clock, Briefcase, MessageQuestion, Award } from 'iconsax-react';
 import logoMapAction from '../../assets/logo.svg';
 import logoMapActionMin from '../../assets/logo-min.svg';
 import './sidebar.css';
@@ -47,15 +47,12 @@ export const Sidebar = ({ isOpen, onClose, activeItem, onItemClick, onCollapsedC
       icon: Danger
     },
     {
-      id: 'team',
-      label: 'Team',
-      icon: ProfileCircle
+      id: 'impact',
+      label: 'Impact',
+      icon: Award
     },
-    {
-      id: 'archive',
-      label: 'Archive',
-      icon: Clock
-    },
+  
+ 
     {
       id: 'profile',
       label: 'Mon profil',

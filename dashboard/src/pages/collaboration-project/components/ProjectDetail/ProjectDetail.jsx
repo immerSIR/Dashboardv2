@@ -11,16 +11,64 @@ import {
   VideoSquare,
   Map as MapIcon,
   UserAdd,
-  CloseCircle
+  CloseCircle,
+  Crown1,
+  People,
+  Eye,
+  Add,
+  SearchNormal1,
+  Buildings2
 } from 'iconsax-react';
 import './project-detail.css';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
+// Liste des organisations disponibles pour invitation
+const AVAILABLE_ORGS = [
+  { id: 'org-1', name: 'Croix-Rouge Sénégalaise', initials: 'CR', color: '#EF4444' },
+  { id: 'org-2', name: 'OCHA', initials: 'OC', color: '#3AA2DD' },
+  { id: 'org-3', name: 'PNUD Sénégal', initials: 'PN', color: '#22C55E' },
+  { id: 'org-4', name: 'UNICEF', initials: 'UN', color: '#1E40AF' },
+  { id: 'org-5', name: 'Médecins Sans Frontières', initials: 'MS', color: '#F59E0B' },
+  { id: 'org-6', name: 'Action Contre la Faim', initials: 'AF', color: '#A855F7' },
+  { id: 'org-7', name: 'OXFAM', initials: 'OX', color: '#10B981' },
+  { id: 'org-8', name: 'Care International', initials: 'CI', color: '#EC4899' },
+  { id: 'org-9', name: 'Save the Children', initials: 'SC', color: '#F97316' },
+  { id: 'org-10', name: 'World Vision', initials: 'WV', color: '#6366F1' }
+];
+
+const ROLE_OPTIONS = [
+  {
+    id: 'leader',
+    label: 'Leader',
+    description: 'Pilote l\'action et coordonne les autres organisations',
+    icon: Crown1,
+    color: '#F59E0B'
+  },
+  {
+    id: 'contributeur',
+    label: 'Contributeur',
+    description: 'Participe activement à la réalisation des tâches',
+    icon: People,
+    color: '#3AA2DD'
+  },
+  {
+    id: 'observateur',
+    label: 'Observateur',
+    description: 'Suit l\'avancement sans participer directement',
+    icon: Eye,
+    color: '#6C7278'
+  }
+];
+
 export const ProjectDetail = ({ project, onBack }) => {
   const [joinOpen, setJoinOpen] = useState(false);
   const [joinClosing, setJoinClosing] = useState(false);
   const [motif, setMotif] = useState('');
+  const [invitedOrgs, setInvitedOrgs] = useState([]);
+  const [orgSearch, setOrgSearch] = useState('');
+  const [showOrgDropdown, setShowOrgDropdown] = useState(false);
+  const [selfRole, setSelfRole] = useState('contributeur');
 
   const openJoinModal = () => {
     setJoinClosing(false);
@@ -32,14 +80,45 @@ export const ProjectDetail = ({ project, onBack }) => {
     setTimeout(() => {
       setJoinOpen(false);
       setJoinClosing(false);
+      setMotif('');
+      setInvitedOrgs([]);
+      setOrgSearch('');
+      setShowOrgDropdown(false);
+      setSelfRole('contributeur');
     }, 280);
   };
 
+  const addInvitedOrg = (org) => {
+    if (invitedOrgs.find((o) => o.id === org.id)) return;
+    setInvitedOrgs((prev) => [...prev, { ...org, role: 'contributeur' }]);
+    setOrgSearch('');
+    setShowOrgDropdown(false);
+  };
+
+  const removeInvitedOrg = (orgId) => {
+    setInvitedOrgs((prev) => prev.filter((o) => o.id !== orgId));
+  };
+
+  const updateOrgRole = (orgId, role) => {
+    setInvitedOrgs((prev) =>
+      prev.map((o) => (o.id === orgId ? { ...o, role } : o))
+    );
+  };
+
+  const filteredOrgs = AVAILABLE_ORGS.filter(
+    (org) =>
+      !invitedOrgs.find((o) => o.id === org.id) &&
+      org.name.toLowerCase().includes(orgSearch.toLowerCase())
+  );
+
   const handleJoinSubmit = (e) => {
     e.preventDefault();
-    // TODO: envoyer le motif au backend
-    console.log('Rejoindre projet', project?.id, 'motif:', motif);
-    setMotif('');
+    // TODO: envoyer au backend
+    console.log('Rejoindre projet', project?.id, {
+      motif,
+      selfRole,
+      invitedOrgs
+    });
     closeJoinModal();
   };
 
@@ -74,7 +153,7 @@ export const ProjectDetail = ({ project, onBack }) => {
             onClick={openJoinModal}
           >
             <UserAdd size={16} variant="Bold" color="#FFFFFF" />
-            Rejoindre l'action
+            {project.isOwner ? 'Inviter des organisations' : "Rejoindre l'action"}
           </button>
         </div>
 
@@ -249,7 +328,9 @@ export const ProjectDetail = ({ project, onBack }) => {
           >
             <header className="join-modal-header">
               <div>
-                <h3 className="join-modal-title">Rejoindre l'action</h3>
+                <h3 className="join-modal-title">
+                  {project.isOwner ? 'Inviter des organisations' : "Rejoindre l'action"}
+                </h3>
                 <p className="join-modal-subtitle">{project.title}</p>
               </div>
               <button
@@ -264,22 +345,205 @@ export const ProjectDetail = ({ project, onBack }) => {
 
             <form className="join-modal-form" onSubmit={handleJoinSubmit}>
               <div className="join-modal-body">
-                <label htmlFor="join-motif" className="join-modal-label">
-                  Motif <span className="required">*</span>
-                </label>
-                <p className="join-modal-help">
-                  Expliquez pourquoi vous souhaitez rejoindre ce projet et ce
-                  que vous pouvez apporter.
-                </p>
-                <textarea
-                  id="join-motif"
-                  className="join-modal-textarea"
-                  rows={8}
-                  value={motif}
-                  onChange={(e) => setMotif(e.target.value)}
-                  placeholder="Ex : Je suis ingénieure environnementale et je souhaite contribuer..."
-                  required
-                />
+                {!project.isOwner && (
+                  <>
+                    <label htmlFor="join-motif" className="join-modal-label">
+                      Motif <span className="required">*</span>
+                    </label>
+                    <p className="join-modal-help">
+                      Expliquez pourquoi vous souhaitez rejoindre ce projet et ce
+                      que vous pouvez apporter.
+                    </p>
+                    <textarea
+                      id="join-motif"
+                      className="join-modal-textarea"
+                      rows={6}
+                      value={motif}
+                      onChange={(e) => setMotif(e.target.value)}
+                      placeholder="Ex : Je suis ingénieure environnementale et je souhaite contribuer..."
+                      required
+                    />
+
+                    {/* Sélecteur de rôle pour soi-même */}
+                    <div className="self-role-section">
+                      <label className="join-modal-label">
+                        Rôle souhaité <span className="required">*</span>
+                      </label>
+                      <p className="join-modal-help">
+                        Choisissez le rôle que vous souhaitez avoir dans ce projet.
+                      </p>
+                      <div className="role-options">
+                        {ROLE_OPTIONS.map((role) => {
+                          const RoleIcon = role.icon;
+                          const isSelected = selfRole === role.id;
+                          return (
+                            <button
+                              type="button"
+                              key={role.id}
+                              className={`role-option ${isSelected ? 'is-selected' : ''}`}
+                              onClick={() => setSelfRole(role.id)}
+                              style={isSelected ? { borderColor: role.color, color: role.color } : {}}
+                              title={role.description}
+                            >
+                              <RoleIcon
+                                size={14}
+                                variant={isSelected ? 'Bold' : 'Linear'}
+                                color={isSelected ? role.color : '#6C7278'}
+                              />
+                              {role.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {(() => {
+                        const role = ROLE_OPTIONS.find((r) => r.id === selfRole);
+                        return role ? (
+                          <p className="invited-org-role-desc">{role.description}</p>
+                        ) : null;
+                      })()}
+                    </div>
+                  </>
+                )}
+
+                {/* Section Inviter des organisations - uniquement pour le propriétaire */}
+                {project.isOwner && (
+                <div className={`invite-orgs-section ${project.isOwner ? 'is-owner' : ''}`}>
+                  <div className="invite-orgs-header">
+                    <Buildings2 size={18} variant="Bold" color="#3AA2DD" />
+                    <div>
+                      <label className="join-modal-label">
+                        Inviter des organisations
+                      </label>
+                      <p className="join-modal-help">
+                        Invitez d'autres organisations à participer et attribuez-leur un rôle.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Champ recherche */}
+                  <div className="invite-orgs-search-wrapper">
+                    <div className="invite-orgs-search">
+                      <SearchNormal1 size={16} variant="Linear" color="#6C7278" />
+                      <input
+                        type="text"
+                        className="invite-orgs-search-input"
+                        placeholder="Rechercher une organisation..."
+                        value={orgSearch}
+                        onChange={(e) => {
+                          setOrgSearch(e.target.value);
+                          setShowOrgDropdown(true);
+                        }}
+                        onFocus={() => setShowOrgDropdown(true)}
+                      />
+                      {orgSearch && (
+                        <button
+                          type="button"
+                          className="invite-orgs-clear"
+                          onClick={() => setOrgSearch('')}
+                        >
+                          <CloseCircle size={16} variant="Linear" color="#6C7278" />
+                        </button>
+                      )}
+                    </div>
+
+                    {showOrgDropdown && filteredOrgs.length > 0 && (
+                      <div className="invite-orgs-dropdown">
+                        {filteredOrgs.map((org) => (
+                          <button
+                            type="button"
+                            key={org.id}
+                            className="invite-orgs-option"
+                            onClick={() => addInvitedOrg(org)}
+                          >
+                            <div
+                              className="invite-orgs-avatar"
+                              style={{ backgroundColor: org.color }}
+                            >
+                              {org.initials}
+                            </div>
+                            <span className="invite-orgs-option-name">{org.name}</span>
+                            <Add size={18} variant="Linear" color="#3AA2DD" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {showOrgDropdown && orgSearch && filteredOrgs.length === 0 && (
+                      <div className="invite-orgs-dropdown">
+                        <div className="invite-orgs-empty">
+                          Aucune organisation trouvée
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Liste des organisations invitées */}
+                  {invitedOrgs.length > 0 && (
+                    <div className="invite-orgs-list">
+                      <div className="invite-orgs-list-label">
+                        {invitedOrgs.length} organisation{invitedOrgs.length > 1 ? 's' : ''} invitée{invitedOrgs.length > 1 ? 's' : ''}
+                      </div>
+                      {invitedOrgs.map((org) => {
+                        const currentRole = ROLE_OPTIONS.find((r) => r.id === org.role);
+                        return (
+                          <div key={org.id} className="invited-org-card">
+                            <div className="invited-org-info">
+                              <div
+                                className="invited-org-avatar"
+                                style={{ backgroundColor: org.color }}
+                              >
+                                {org.initials}
+                              </div>
+                              <div className="invited-org-name">{org.name}</div>
+                              <button
+                                type="button"
+                                className="invited-org-remove"
+                                onClick={() => removeInvitedOrg(org.id)}
+                                aria-label="Retirer"
+                              >
+                                <CloseCircle size={18} variant="Linear" color="#EF4444" />
+                              </button>
+                            </div>
+
+                            <div className="invited-org-roles">
+                              <span className="invited-org-role-label">Rôle :</span>
+                              <div className="role-options">
+                                {ROLE_OPTIONS.map((role) => {
+                                  const RoleIcon = role.icon;
+                                  const isSelected = org.role === role.id;
+                                  return (
+                                    <button
+                                      type="button"
+                                      key={role.id}
+                                      className={`role-option ${isSelected ? 'is-selected' : ''}`}
+                                      onClick={() => updateOrgRole(org.id, role.id)}
+                                      style={isSelected ? { borderColor: role.color, color: role.color } : {}}
+                                      title={role.description}
+                                    >
+                                      <RoleIcon
+                                        size={14}
+                                        variant={isSelected ? 'Bold' : 'Linear'}
+                                        color={isSelected ? role.color : '#6C7278'}
+                                      />
+                                      {role.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {currentRole && (
+                              <p className="invited-org-role-desc">
+                                {currentRole.description}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                )}
               </div>
 
               <footer className="join-modal-footer">
@@ -293,10 +557,14 @@ export const ProjectDetail = ({ project, onBack }) => {
                 <button
                   type="submit"
                   className="join-btn-primary"
-                  disabled={!motif.trim()}
+                  disabled={
+                    project.isOwner
+                      ? invitedOrgs.length === 0
+                      : !motif.trim()
+                  }
                 >
                   <UserAdd size={16} variant="Bold" color="#FFFFFF" />
-                  Confirmer 
+                  {project.isOwner ? 'Envoyer les invitations' : 'Confirmer'}
                 </button>
               </footer>
             </form>

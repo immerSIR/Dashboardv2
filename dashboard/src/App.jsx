@@ -5,6 +5,7 @@ import { Collaboration } from './pages/collaboration';
 import { Incident } from './pages/incident';
 import { CollaborationProject } from './pages/collaboration-project';
 import { CollaborationRequests } from './pages/collaboration-requests';
+import { Impact } from './pages/impact';
 import { Profile } from './pages/profile';
 
 function App() {
@@ -64,6 +65,15 @@ function App() {
       case 'requests':
         return (
           <CollaborationRequests
+            onLogout={handleLogout}
+            user={user}
+            activeNav={activeNav}
+            onNavChange={setActiveNav}
+          />
+        );
+      case 'impact':
+        return (
+          <Impact
             onLogout={handleLogout}
             user={user}
             activeNav={activeNav}

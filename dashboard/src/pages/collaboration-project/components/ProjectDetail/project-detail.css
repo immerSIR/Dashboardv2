@@ -768,6 +768,293 @@
   background-color: var(--color-surface);
 }
 
+/* ============================================
+   SÉLECTION DU RÔLE PROPRE (NON-OWNER)
+   ============================================ */
+.self-role-section {
+  margin-top: var(--spacing-4);
+  padding-top: var(--spacing-4);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.self-role-section .role-options {
+  margin-top: var(--spacing-1);
+}
+
+/* ============================================
+   INVITATION D'ORGANISATIONS
+   ============================================ */
+.invite-orgs-section {
+  margin-top: var(--spacing-5);
+  padding-top: var(--spacing-5);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.invite-orgs-section.is-owner {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.invite-orgs-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-2);
+}
+
+.invite-orgs-header > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.invite-orgs-search-wrapper {
+  position: relative;
+}
+
+.invite-orgs-search {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3);
+  background-color: var(--color-background);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: border-color 0.2s ease;
+}
+
+.invite-orgs-search:focus-within {
+  border-color: var(--color-primary);
+  background-color: var(--color-surface);
+}
+
+.invite-orgs-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: var(--font-family);
+  font-size: var(--font-size-body-small);
+  color: var(--color-text-primary);
+}
+
+.invite-orgs-search-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.invite-orgs-clear {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.invite-orgs-clear:hover {
+  background-color: var(--color-border);
+}
+
+.invite-orgs-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  max-height: 240px;
+  overflow-y: auto;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: var(--spacing-1);
+}
+
+.invite-orgs-option {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  width: 100%;
+  padding: var(--spacing-2) var(--spacing-3);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease;
+}
+
+.invite-orgs-option:hover {
+  background-color: rgba(58, 162, 221, 0.08);
+}
+
+.invite-orgs-avatar {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+}
+
+.invite-orgs-option-name {
+  flex: 1;
+  font-size: var(--font-size-body-small);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.invite-orgs-empty {
+  padding: var(--spacing-3);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body-small);
+}
+
+/* Liste des organisations invitées */
+.invite-orgs-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.invite-orgs-list-label {
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.invited-org-card {
+  padding: var(--spacing-3);
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.invited-org-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+.invited-org-avatar {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: var(--font-size-body-small);
+  font-weight: var(--font-weight-bold);
+}
+
+.invited-org-name {
+  flex: 1;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.invited-org-remove {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.15s ease;
+}
+
+.invited-org-remove:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.invited-org-roles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.invited-org-role-label {
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+}
+
+.role-options {
+  display: flex;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
+}
+
+.role-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px var(--spacing-3);
+  background-color: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  transition: all 0.2s ease;
+}
+
+.role-option:hover:not(.is-selected) {
+  border-color: var(--color-text-secondary);
+  background-color: var(--color-background);
+}
+
+.role-option.is-selected {
+  background-color: var(--color-surface);
+  border-width: 2px;
+  font-weight: var(--font-weight-bold);
+}
+
+.invited-org-role-desc {
+  margin: 0;
+  padding: var(--spacing-2) var(--spacing-3);
+  background-color: rgba(58, 162, 221, 0.06);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-caption);
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
 .join-modal-footer {
   display: flex;
   gap: var(--spacing-3);

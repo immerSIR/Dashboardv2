@@ -8,7 +8,6 @@ export const ProjectList = ({ onSelectProject, selectedId }) => {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-
   // Build dynamic dropdown options from data
   const types = useMemo(
     () => [...new Set(projects.map((p) => p.type))],

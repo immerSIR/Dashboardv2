@@ -81,7 +81,8 @@ export const projects = [
     participants: [
       { name: 'ONG Verte', initials: 'NGO', color: '#22C55E' }
     ],
-    extraParticipants: 0
+    extraParticipants: 0,
+    isOwner: true
   },
   {
     id: 'p3',
@@ -137,7 +138,8 @@ export const projects = [
     participants: [
       { name: 'Eau Vive', initials: 'EV', color: '#3AA2DD' }
     ],
-    extraParticipants: 1
+    extraParticipants: 1,
+    isOwner: true
   },
   {
     id: 'p5',
@@ -193,6 +195,7 @@ export const projects = [
       { name: 'PAM', initials: 'PAM', color: '#22C55E' },
       { name: 'Mairie', initials: 'MA', color: '#3AA2DD' }
     ],
-    extraParticipants: 3
+    extraParticipants: 3,
+    isOwner: true
   }
 ];

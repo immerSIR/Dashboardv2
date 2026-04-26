@@ -172,6 +172,7 @@
 }
 
 .project-thumb {
+  position: relative;
   width: 80px;
   height: 80px;
   border-radius: var(--radius-md);
@@ -179,6 +180,112 @@
   background-position: center;
   background-color: var(--color-background);
   flex-shrink: 0;
+}
+
+/* --- Ownership: tabs + owner accents --- */
+.project-ownership-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: var(--spacing-3);
+  flex-wrap: wrap;
+}
+
+.project-ownership-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1.5px solid var(--color-border, #E5E7EB);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.project-ownership-tab:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.project-ownership-tab.is-active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(58, 162, 221, 0.35);
+}
+
+.project-ownership-tab.is-mine.is-active {
+  background: linear-gradient(135deg, #F59E0B, #FBBF24);
+  border-color: #F59E0B;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
+}
+
+.project-ownership-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+}
+
+.project-ownership-tab.is-active .project-ownership-badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+/* Tag "Mon projet" */
+.project-owner-tag {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 7px;
+  background: linear-gradient(135deg, #F59E0B, #FBBF24);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.5);
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+}
+
+/* Owner card highlight */
+.project-card.is-owner {
+  border-color: rgba(245, 158, 11, 0.35);
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.04) 0%, transparent 60%);
+}
+
+.project-card.is-owner:hover {
+  border-color: #F59E0B;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.18);
+}
+
+@media (max-width: 768px) {
+  .project-ownership-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .project-ownership-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .project-ownership-tab {
+    flex-shrink: 0;
+  }
 }
 
 .project-card-info {

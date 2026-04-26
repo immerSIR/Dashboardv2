@@ -8,7 +8,17 @@ import {
   Calendar,
   MessageText1,
   ArrowRight2,
-  CloseSquare
+  CloseSquare,
+  Building,
+  Crown1,
+  People,
+  Eye,
+  UserAdd,
+  Send2,
+  ArrowDown2,
+  ArrowUp2,
+  Import,
+  Export
 } from 'iconsax-react';
 import { Header, Sidebar } from '../../components/layout';
 import { collaborationRequests as allRequests } from './data/requests';
@@ -35,6 +45,12 @@ const STATUS_META = {
   }
 };
 
+const ROLE_META = {
+  leader: { label: 'Leader', icon: Crown1, color: '#F59E0B' },
+  contributeur: { label: 'Contributeur', icon: People, color: '#3AA2DD' },
+  observateur: { label: 'Observateur', icon: Eye, color: '#6C7278' }
+};
+
 const formatDate = (iso) => {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -57,6 +73,8 @@ export const CollaborationRequests = ({
   const [requests, setRequests] = useState(allRequests);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  // 'all' | 'app-sent' | 'app-received' | 'sug-sent' | 'sug-received'
+  const [typeFilter, setTypeFilter] = useState('all');
   const [expanded, setExpanded] = useState(null);
 
   // Modal de décision (un seul, avec choix interne)
@@ -64,12 +82,14 @@ export const CollaborationRequests = ({
   const [decisionAction, setDecisionAction] = useState(null); // 'accept' | 'reject' | null
   const [decisionClosing, setDecisionClosing] = useState(false);
   const [responseText, setResponseText] = useState('');
+  const [suggestionsStatus, setSuggestionsStatus] = useState({}); // {orgName: 'accepted' | 'rejected'}
 
   const openDecision = (request) => {
     setDecisionRequest(request);
     setDecisionAction(null);
     setResponseText('');
     setDecisionClosing(false);
+    setSuggestionsStatus({});
   };
 
   const closeDecision = () => {
@@ -79,6 +99,7 @@ export const CollaborationRequests = ({
       setDecisionAction(null);
       setDecisionClosing(false);
       setResponseText('');
+      setSuggestionsStatus({});
     }, 280);
   };
 
@@ -106,7 +127,11 @@ export const CollaborationRequests = ({
       all: requests.length,
       pending: requests.filter((r) => r.status === 'pending').length,
       accepted: requests.filter((r) => r.status === 'accepted').length,
-      rejected: requests.filter((r) => r.status === 'rejected').length
+      rejected: requests.filter((r) => r.status === 'rejected').length,
+      appSent: requests.filter((r) => r.type !== 'suggestion' && r.direction === 'sent').length,
+      appReceived: requests.filter((r) => r.type !== 'suggestion' && r.direction === 'received').length,
+      sugSent: requests.filter((r) => r.type === 'suggestion' && r.direction === 'sent').length,
+      sugReceived: requests.filter((r) => r.type === 'suggestion' && r.direction === 'received').length
     }),
     [requests]
   );
@@ -114,15 +139,23 @@ export const CollaborationRequests = ({
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return requests.filter((r) => {
+      const isSuggestion = r.type === 'suggestion';
+      const isSent = r.direction === 'sent';
+      if (typeFilter === 'app-sent' && (isSuggestion || !isSent)) return false;
+      if (typeFilter === 'app-received' && (isSuggestion || isSent)) return false;
+      if (typeFilter === 'sug-sent' && (!isSuggestion || !isSent)) return false;
+      if (typeFilter === 'sug-received' && (!isSuggestion || isSent)) return false;
       if (statusFilter !== 'all' && r.status !== statusFilter) return false;
       if (!q) return true;
       return (
         r.projectTitle.toLowerCase().includes(q) ||
         r.organisation.toLowerCase().includes(q) ||
-        r.role.toLowerCase().includes(q)
+        (r.role || r.proposedRole || '').toLowerCase().includes(q) ||
+        (r.applicantName || '').toLowerCase().includes(q) ||
+        (r.applicantOrg || '').toLowerCase().includes(q)
       );
     });
-  }, [search, statusFilter, requests]);
+  }, [search, statusFilter, typeFilter, requests]);
 
   return (
     <div className="requests-layout">
@@ -154,10 +187,62 @@ export const CollaborationRequests = ({
               <div>
                 <h1 className="requests-title">Demandes de collaboration</h1>
                 <p className="requests-subtitle">
-                  Suivez l'état de vos demandes de participation aux actions
-                  des organisations.
+                  Gérez vos demandes envoyées et les invitations reçues des organisations.
                 </p>
               </div>
+            </div>
+
+            {/* Onglets type + direction */}
+            <div className="requests-type-tabs">
+              <button
+                type="button"
+                className={`requests-type-tab ${typeFilter === 'all' ? 'is-active' : ''}`}
+                onClick={() => setTypeFilter('all')}
+              >
+                <Briefcase size={16} variant="Bold" color="currentColor" />
+                Toutes
+                <span className="requests-tab-badge">{counts.all}</span>
+              </button>
+              <button
+                type="button"
+                className={`requests-type-tab ${typeFilter === 'app-sent' ? 'is-active' : ''}`}
+                onClick={() => setTypeFilter('app-sent')}
+              >
+                <Export size={16} variant="Bold" color="currentColor" />
+                Demandes envoyées
+                <span className="requests-tab-badge">{counts.appSent}</span>
+              </button>
+              <button
+                type="button"
+                className={`requests-type-tab ${typeFilter === 'app-received' ? 'is-active' : ''}`}
+                onClick={() => setTypeFilter('app-received')}
+              >
+                <Import size={16} variant="Bold" color="currentColor" />
+                Demandes reçues
+                <span className="requests-tab-badge">{counts.appReceived}</span>
+              </button>
+              <button
+                type="button"
+                className={`requests-type-tab ${typeFilter === 'sug-sent' ? 'is-active' : ''}`}
+                onClick={() => setTypeFilter('sug-sent')}
+              >
+                <Send2 size={16} variant="Bold" color="currentColor" />
+                Suggestions envoyées
+                <span className="requests-tab-badge">{counts.sugSent}</span>
+              </button>
+              <button
+                type="button"
+                className={`requests-type-tab ${typeFilter === 'sug-received' ? 'is-active' : ''}`}
+                onClick={() => setTypeFilter('sug-received')}
+              >
+                <UserAdd size={16} variant="Bold" color="currentColor" />
+                Suggestions reçues
+                {counts.sugReceived > 0 && (
+                  <span className="requests-tab-badge requests-tab-badge-highlight">
+                    {counts.sugReceived}
+                  </span>
+                )}
+              </button>
             </div>
 
             {/* Toolbar */}
@@ -237,12 +322,26 @@ export const CollaborationRequests = ({
                   const meta = STATUS_META[r.status];
                   const StatusIcon = meta.icon;
                   const isOpen = expanded === r.id;
+                  const isSuggestion = r.type === 'suggestion';
+                  const isSent = r.direction === 'sent';
+                  const collaboratorsCount = r.proposedCollaborators?.length || 0;
+
+                  const directionLabel = isSuggestion
+                    ? isSent
+                      ? 'Sugges. envoyée'
+                      : 'Sugges. reçue'
+                    : isSent
+                    ? 'Deman. envoyée'
+                    : 'Deman. reçue';
+                  const DirectionIcon = isSent ? Export : Import;
 
                   return (
                     <article
                       key={r.id}
                       className={`request-card ${meta.className} ${
                         isOpen ? 'is-open' : ''
+                      } ${isSuggestion ? 'is-suggestion' : ''} ${
+                        isSent ? 'is-sent' : 'is-received'
                       }`}
                     >
                       <div
@@ -252,7 +351,22 @@ export const CollaborationRequests = ({
                         <div
                           className="request-thumb"
                           style={{ backgroundImage: `url(${r.projectImage})` }}
-                        />
+                        >
+                          <span
+                            className={`request-direction-tag ${
+                              isSent
+                                ? isSuggestion
+                                  ? 'is-sent-suggestion'
+                                  : 'is-sent-application'
+                                : isSuggestion
+                                ? 'is-received-suggestion'
+                                : 'is-received-application'
+                            }`}
+                          >
+                         
+                            {directionLabel}
+                          </span>
+                        </div>
 
                         <div className="request-info">
                           <div className="request-info-top">
@@ -268,10 +382,33 @@ export const CollaborationRequests = ({
                               {r.organisation}
                             </span>
                             <span className="request-dot">•</span>
-                            <span className="request-role">{r.role}</span>
+                            {isSuggestion ? (
+                              <span className="request-role-badge request-suggestion-count">
+                                <Building size={12} variant="Bold" color="#F59E0B" />
+                                {collaboratorsCount} org.{collaboratorsCount > 1 ? 's' : ''} proposée{collaboratorsCount > 1 ? 's' : ''}
+                              </span>
+                            ) : (
+                              <span className="request-role">{r.role}</span>
+                            )}
                           </div>
 
                           <h3 className="request-project">{r.projectTitle}</h3>
+
+                          {!isSuggestion && !isSent && r.applicantName && (
+                            <div className="request-applicant">
+                              <span className="request-applicant-label">
+                                Candidat :
+                              </span>
+                              <strong>{r.applicantName}</strong>
+                              {r.applicantOrg && (
+                                <span className="request-applicant-org">
+                                  — {r.applicantOrg}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                       
 
                           <div className="request-meta">
                             <div className="request-meta-row">
@@ -281,7 +418,8 @@ export const CollaborationRequests = ({
                                 color="#6C7278"
                               />
                               <span>
-                                Envoyée le {formatDate(r.submittedAt)}
+                                {isSent ? 'Envoyée' : 'Reçue'} le{' '}
+                                {formatDate(r.submittedAt)}
                               </span>
                             </div>
                             {r.respondedAt && (
@@ -326,12 +464,89 @@ export const CollaborationRequests = ({
 
                       {isOpen && (
                         <div className="request-card-body">
-                          <div className="request-block">
-                            <h4 className="request-block-label">
-                              Mon motif
-                            </h4>
-                            <p className="request-block-text">{r.motif}</p>
-                          </div>
+                          {isSuggestion ? (
+                            <>
+                              <div className="request-block request-invitation-block">
+                                <h4 className="request-block-label">
+                                  <Crown1 size={14} variant="Bold" color="#F59E0B" />
+                                  Message du leader
+                                </h4>
+                                <p className="request-block-text">
+                                  {r.suggestionMessage}
+                                </p>
+                                {r.suggestedBy && (
+                                  <div className="request-invited-by">
+                                    Suggéré par <strong>{r.suggestedBy}</strong>
+                                    {r.suggestedByRole && (
+                                      <span className="request-invited-role">
+                                        {' '}— {r.suggestedByRole}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              {r.proposedCollaborators &&
+                                r.proposedCollaborators.length > 0 && (
+                                  <div className="request-block">
+                                    <h4 className="request-block-label">
+                                      <Building size={14} variant="Bold" color="#3AA2DD" />
+                                      Organisations proposées ({r.proposedCollaborators.length})
+                                    </h4>
+                                    <div className="proposed-collabs-list">
+                                      {r.proposedCollaborators.map((collab, idx) => {
+                                        const cRoleMeta = ROLE_META[collab.role];
+                                        const CRoleIcon = cRoleMeta?.icon;
+                                        return (
+                                          <div key={idx} className="proposed-collab-card">
+                                            <div className="proposed-collab-header">
+                                              <div
+                                                className="proposed-collab-avatar"
+                                                style={{ backgroundColor: collab.color }}
+                                              >
+                                                {collab.initials}
+                                              </div>
+                                              <div className="proposed-collab-info">
+                                                <div className="proposed-collab-name">
+                                                  {collab.name}
+                                                </div>
+                                                {cRoleMeta && (
+                                                  <span
+                                                    className="proposed-collab-role"
+                                                    style={{ color: cRoleMeta.color }}
+                                                  >
+                                                    {CRoleIcon && (
+                                                      <CRoleIcon
+                                                        size={11}
+                                                        variant="Bold"
+                                                        color={cRoleMeta.color}
+                                                      />
+                                                    )}
+                                                    {cRoleMeta.label}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                            {collab.comment && (
+                                              <p className="proposed-collab-comment">
+                                                {collab.comment}
+                                              </p>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                            </>
+                          ) : (
+                            <div className="request-block">
+                              <h4 className="request-block-label">Mon motif</h4>
+                              <p className="request-block-text">{r.motif}</p>
+                            </div>
+                          )}
+
+                         
 
                           {r.response && (
                             <div
@@ -355,28 +570,37 @@ export const CollaborationRequests = ({
                                   color="#F59E0B"
                                 />
                                 <span>
-                                  Cette demande est en attente de votre
-                                  décision.
+                                  {isSent
+                                    ? isSuggestion
+                                      ? 'Suggestion en attente de validation par l\'organisation.'
+                                      : 'Demande en attente de réponse de l\'organisation.'
+                                    : isSuggestion
+                                    ? 'Acceptez pour envoyer les invitations aux organisations proposées.'
+                                    : 'Cette demande est en attente de votre décision.'}
                                 </span>
                               </div>
 
-                              <div className="request-actions">
-                                <button
-                                  type="button"
-                                  className="request-btn request-btn-respond"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openDecision(r);
-                                  }}
-                                >
-                                  <MessageText1
-                                    size={16}
-                                    variant="Bold"
-                                    color="#FFFFFF"
-                                  />
-                                  Répondre à la demande
-                                </button>
-                              </div>
+                              {!isSent && (
+                                <div className="request-actions">
+                                  <button
+                                    type="button"
+                                    className="request-btn request-btn-respond"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openDecision(r);
+                                    }}
+                                  >
+                                    <MessageText1
+                                      size={16}
+                                      variant="Bold"
+                                      color="#FFFFFF"
+                                    />
+                                    {isSuggestion
+                                      ? 'Traiter la suggestion'
+                                      : 'Répondre à la demande'}
+                                  </button>
+                                </div>
+                              )}
                             </>
                           )}
                         </div>
@@ -413,7 +637,9 @@ export const CollaborationRequests = ({
             <header className="decision-modal-header">
               <div>
                 <h3 className="decision-modal-title">
-                  Répondre à la demande
+                  {decisionRequest.type === 'suggestion'
+                    ? 'Traiter la suggestion'
+                    : 'Répondre à la demande'}
                 </h3>
                 <p className="decision-modal-subtitle">
                   {decisionRequest.projectTitle}
@@ -448,17 +674,179 @@ export const CollaborationRequests = ({
                       {decisionRequest.organisation}
                     </span>
                     <span className="decision-summary-role">
-                      Rôle demandé : <strong>{decisionRequest.role}</strong>
+                      {decisionRequest.type === 'suggestion' ? (
+                        <>
+                          {decisionRequest.proposedCollaborators?.length || 0}{' '}
+                          organisation
+                          {(decisionRequest.proposedCollaborators?.length || 0) > 1
+                            ? 's'
+                            : ''}{' '}
+                          proposée
+                          {(decisionRequest.proposedCollaborators?.length || 0) > 1
+                            ? 's'
+                            : ''}
+                        </>
+                      ) : (
+                        <>
+                          Rôle demandé : <strong>{decisionRequest.role}</strong>
+                        </>
+                      )}
                     </span>
                   </div>
                 </div>
 
                 <div className="decision-motif">
-                  <h4 className="decision-block-label">Motif fourni</h4>
+                  <h4 className="decision-block-label">
+                    {decisionRequest.type === 'suggestion'
+                      ? 'Message du leader'
+                      : 'Motif fourni'}
+                  </h4>
                   <p className="decision-motif-text">
-                    {decisionRequest.motif}
+                    {decisionRequest.type === 'suggestion'
+                      ? decisionRequest.suggestionMessage
+                      : decisionRequest.motif}
                   </p>
+                  {decisionRequest.type === 'suggestion' &&
+                    decisionRequest.suggestedBy && (
+                      <div className="decision-invited-by">
+                        Suggéré par <strong>{decisionRequest.suggestedBy}</strong>
+                        {decisionRequest.suggestedByRole && (
+                          <span> — {decisionRequest.suggestedByRole}</span>
+                        )}
+                      </div>
+                    )}
                 </div>
+
+                {/* Liste des organisations proposées */}
+                {decisionRequest.type === 'suggestion' &&
+                  decisionRequest.proposedCollaborators &&
+                  decisionRequest.proposedCollaborators.length > 0 && (
+                    <div className="decision-proposed">
+                      <h4 className="decision-block-label">
+                        Organisations à inviter ({decisionRequest.proposedCollaborators.length})
+                      </h4>
+                      <p className="decision-proposed-hint">
+                        Si vous acceptez, des invitations seront envoyées à ces organisations avec les rôles indiqués.
+                      </p>
+                      <div className="proposed-collabs-list">
+                        {decisionRequest.proposedCollaborators.map((collab, idx) => {
+                          const cRoleMeta = ROLE_META[collab.role];
+                          const CRoleIcon = cRoleMeta?.icon;
+                          return (
+                            <div key={idx} className="proposed-collab-card">
+                              <div className="proposed-collab-header">
+                                <div
+                                  className="proposed-collab-avatar"
+                                  style={{ backgroundColor: collab.color }}
+                                >
+                                  {collab.initials}
+                                </div>
+                                <div className="proposed-collab-info">
+                                  <div className="proposed-collab-name">
+                                    {collab.name}
+                                  </div>
+                                  {cRoleMeta && (
+                                    <span
+                                      className="proposed-collab-role"
+                                      style={{ color: cRoleMeta.color }}
+                                    >
+                                      {CRoleIcon && (
+                                        <CRoleIcon
+                                          size={11}
+                                          variant="Bold"
+                                          color={cRoleMeta.color}
+                                        />
+                                      )}
+                                      {cRoleMeta.label}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              {collab.comment && (
+                                <p className="proposed-collab-comment">
+                                  {collab.comment}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                {/* Suggestions d'organisations */}
+                {decisionRequest.suggestedOrganisations &&
+                  decisionRequest.suggestedOrganisations.length > 0 && (
+                    <div className="decision-suggestions">
+                      <h4 className="decision-block-label">
+                        Organisations suggérées ({decisionRequest.suggestedOrganisations.length})
+                      </h4>
+                      <p className="decision-suggestions-hint">
+                        {decisionRequest.organisation} recommande d'impliquer ces organisations. Acceptez ou refusez chaque suggestion :
+                      </p>
+                      <div className="decision-suggestions-list">
+                        {decisionRequest.suggestedOrganisations.map((org, idx) => {
+                          const status = suggestionsStatus[org.name];
+                          return (
+                            <div key={idx} className={`decision-suggestion-item ${status ? `is-${status}` : ''}`}>
+                              <div className="decision-suggestion-left">
+                                <div
+                                  className="decision-suggestion-avatar"
+                                  style={{ backgroundColor: org.color }}
+                                >
+                                  {org.initials}
+                                </div>
+                                <div className="decision-suggestion-info">
+                                  <div className="decision-suggestion-name">
+                                    {org.name}
+                                  </div>
+                                  <div className="decision-suggestion-reason">
+                                    {org.reason}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="decision-suggestion-actions">
+                                <button
+                                  type="button"
+                                  className={`decision-suggestion-btn is-accept ${status === 'accepted' ? 'is-active' : ''}`}
+                                  onClick={() =>
+                                    setSuggestionsStatus((prev) => ({
+                                      ...prev,
+                                      [org.name]: prev[org.name] === 'accepted' ? null : 'accepted'
+                                    }))
+                                  }
+                                  title="Accepter cette organisation"
+                                >
+                                  <TickCircle
+                                    size={18}
+                                    variant="Bold"
+                                    color={status === 'accepted' ? '#FFFFFF' : '#22C55E'}
+                                  />
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`decision-suggestion-btn is-reject ${status === 'rejected' ? 'is-active' : ''}`}
+                                  onClick={() =>
+                                    setSuggestionsStatus((prev) => ({
+                                      ...prev,
+                                      [org.name]: prev[org.name] === 'rejected' ? null : 'rejected'
+                                    }))
+                                  }
+                                  title="Refuser cette organisation"
+                                >
+                                  <CloseSquare
+                                    size={18}
+                                    variant="Bold"
+                                    color={status === 'rejected' ? '#FFFFFF' : '#EF4444'}
+                                  />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                 {/* Choix de la décision */}
                 <div className="decision-choice-group" role="radiogroup">
@@ -549,7 +937,9 @@ export const CollaborationRequests = ({
                         variant="Bold"
                         color="#FFFFFF"
                       />
-                      Confirmer le refus
+                      {decisionRequest.type === 'suggestion'
+                        ? 'Refuser la suggestion'
+                        : 'Confirmer le refus'}
                     </>
                   ) : (
                     <>
@@ -559,7 +949,9 @@ export const CollaborationRequests = ({
                         color="#FFFFFF"
                       />
                       {decisionAction === 'accept'
-                        ? "Confirmer l'acceptation"
+                        ? decisionRequest.type === 'suggestion'
+                          ? 'Accepter et envoyer les invitations'
+                          : "Confirmer l'acceptation"
                         : 'Confirmer'}
                     </>
                   )}

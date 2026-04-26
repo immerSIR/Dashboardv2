@@ -1,9 +1,10 @@
 import React from 'react';
+import { Crown1 } from 'iconsax-react';
 
 export const ProjectCard = ({ project, onClick, isSelected }) => {
   return (
     <article
-      className={`project-card ${isSelected ? 'is-selected' : ''}`}
+      className={`project-card ${isSelected ? 'is-selected' : ''} ${project.isOwner ? 'is-owner' : ''}`}
       onClick={() => onClick(project.id)}
       role="button"
       tabIndex={0}
@@ -19,7 +20,14 @@ export const ProjectCard = ({ project, onClick, isSelected }) => {
           className="project-thumb"
           style={{ backgroundImage: `url(${project.image})` }}
           aria-hidden="true"
-        />
+        >
+          {project.isOwner && (
+            <span className="project-owner-tag">
+              <Crown1 size={12} variant="Bold" color="#FFFFFF" />
+              Mon projet
+            </span>
+          )}
+        </div>
         <div className="project-card-info">
           <h3 className="project-title">{project.title}</h3>
           <div className="project-badges">
