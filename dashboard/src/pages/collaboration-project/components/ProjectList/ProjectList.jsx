@@ -35,7 +35,7 @@ export const ProjectList = ({ onSelectProject, selectedId }) => {
     <section className="project-list-section">
       {/* Header */}
       <header className="project-list-header">
-        <h1 className="project-list-title">Projets Collaboratifs</h1>
+        <h1 className="project-list-title">Incidents</h1>
         <p className="project-list-subtitle">
           Rejoignez des initiatives environnementales en cours ou proposez votre
           expertise pour soutenir les communautés locales.

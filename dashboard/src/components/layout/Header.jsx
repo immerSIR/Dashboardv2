@@ -13,27 +13,11 @@ export const Header = ({ onMenuToggle, user, onLogout, onNavChange }) => {
   // Données de notifications (exemple)
   const notifications = [
     {
-      id: 1,
-      type: 'incident',
-      title: 'Nouvel incident signalé',
-      message: 'Un incident a été signalé dans la zone Nord',
-      time: 'Il y a 5 min',
-      unread: true
-    },
-    {
       id: 2,
       type: 'collaboration',
       title: 'Nouvelle demande de collaboration',
       message: 'L\'équipe B demande votre assistance',
       time: 'Il y a 1h',
-      unread: true
-    },
-    {
-      id: 3,
-      type: 'incident',
-      title: 'Incident résolu',
-      message: 'L\'incident dans la zone Sud a été résolu',
-      time: 'Il y a 2h',
       unread: true
     },
     {
@@ -53,14 +37,6 @@ export const Header = ({ onMenuToggle, user, onLogout, onNavChange }) => {
       unread: false
     },
     {
-      id: 6,
-      type: 'incident',
-      title: 'Alerte zone Est',
-      message: 'Nouvelle alerte détectée dans la zone Est',
-      time: 'Il y a 5h',
-      unread: false
-    },
-    {
       id: 7,
       type: 'system',
       title: 'Sauvegarde effectuée',
@@ -74,14 +50,6 @@ export const Header = ({ onMenuToggle, user, onLogout, onNavChange }) => {
       title: 'Nouvelle mission assignée',
       message: 'Vous avez été assigné à une nouvelle mission',
       time: 'Il y a 8h',
-      unread: false
-    },
-    {
-      id: 9,
-      type: 'incident',
-      title: 'Incident critique',
-      message: 'Un incident critique nécessite votre attention',
-      time: 'Il y a 10h',
       unread: false
     },
     {
@@ -99,8 +67,6 @@ export const Header = ({ onMenuToggle, user, onLogout, onNavChange }) => {
   // Fonction pour obtenir l'icône selon le type
   const getNotificationIcon = (type) => {
     switch(type) {
-      case 'incident':
-        return <Danger size={20} variant="Bold" color="#EF4444" />;
       case 'collaboration':
         return <People size={20} variant="Bold" color="#3AA2DD" />;
       case 'system':

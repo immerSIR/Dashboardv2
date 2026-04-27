@@ -72,17 +72,14 @@ export const Impact = ({ onLogout, user, activeNav, onNavChange }) => {
       }
 
       // Catégorie d'impact
-      if (categoryFilter !== 'all') {
-        if (!inc.impacts[categoryFilter]) return false;
-      }
+      if (categoryFilter !== 'all' && !inc.impacts[categoryFilter]) return false;
 
       // Recherche
       if (!q) return true;
       return (
         inc.title.toLowerCase().includes(q) ||
-        inc.location.toLowerCase().includes(q) ||
         inc.type.toLowerCase().includes(q) ||
-        inc.region.toLowerCase().includes(q)
+        inc.location.toLowerCase().includes(q)
       );
     });
   }, [search, categoryFilter, periodFilter]);
@@ -382,7 +379,7 @@ export const Impact = ({ onLogout, user, activeNav, onNavChange }) => {
               </div>
             </div>
 
-            {/* Liste incidents */}
+            {/* Liste actions */}
             <div className="impact-section">
               <div className="impact-section-header">
                 <TickCircle size={20} variant="Bold" color="#22C55E" />
@@ -405,7 +402,7 @@ export const Impact = ({ onLogout, user, activeNav, onNavChange }) => {
                     return (
                       <article
                         key={inc.id}
-                        className={`impact-card ${isOpen ? 'is-open' : ''}`}
+                        className={`impact-incident-card ${isOpen ? 'is-open' : ''}`}
                       >
                         <div
                           className="impact-card-main"
@@ -431,6 +428,7 @@ export const Impact = ({ onLogout, user, activeNav, onNavChange }) => {
                                 {inc.type}
                               </span>
                               <span className="impact-card-dot">•</span>
+                              <span className="impact-incident-location">{inc.location}</span>
                               <span className="impact-card-region">
                                 <Location
                                   size={12}
@@ -448,14 +446,15 @@ export const Impact = ({ onLogout, user, activeNav, onNavChange }) => {
                             </p>
 
                             {/* Métriques inline */}
-                            <div className="impact-card-metrics">
-                              {Object.entries(inc.impacts).map(([key, val]) => {
-                                const cat = IMPACT_CATEGORIES[key];
-                                if (!cat || !val?.total) return null;
-                                const Icon = CATEGORY_ICONS[key];
+                            <div className="impact-incident-meta-inline">
+                              {Object.keys(inc.impacts).map((catKey) => {
+                                const cat = IMPACT_CATEGORIES[catKey];
+                                const val = inc.impacts[catKey]?.total;
+                                if (!cat || !val) return null;
+                                const Icon = CATEGORY_ICONS[catKey];
                                 return (
                                   <div
-                                    key={key}
+                                    key={catKey}
                                     className="impact-card-metric"
                                     style={{
                                       backgroundColor: cat.bgColor,
@@ -468,7 +467,7 @@ export const Impact = ({ onLogout, user, activeNav, onNavChange }) => {
                                       color={cat.color}
                                     />
                                     <strong>
-                                      {val.total.toLocaleString('fr-FR')}
+                                      {val.toLocaleString('fr-FR')}
                                     </strong>
                                     <span>{cat.label.toLowerCase()}</span>
                                   </div>
@@ -485,7 +484,7 @@ export const Impact = ({ onLogout, user, activeNav, onNavChange }) => {
                                 />
                                 <span>
                                   Résolu le {formatDate(inc.resolvedAt)} ·{' '}
-                                  {inc.durationDays}j d'intervention
+                                  {inc.durationDays} jour{inc.durationDays > 1 ? 's' : ''}
                                 </span>
                               </div>
                             </div>
@@ -508,11 +507,11 @@ export const Impact = ({ onLogout, user, activeNav, onNavChange }) => {
                           <div className="impact-card-body">
                             {/* Détails par catégorie */}
                             <div className="impact-detail-grid">
-                              {Object.entries(inc.impacts).map(([key, val]) => {
+                              {Object.entries(inc.impacts).map(([key, data]) => {
                                 const cat = IMPACT_CATEGORIES[key];
-                                if (!cat || !val) return null;
+                                if (!cat || !data) return null;
                                 const Icon = CATEGORY_ICONS[key];
-                                const subEntries = Object.entries(val).filter(
+                                const subEntries = Object.entries(data).filter(
                                   ([k]) => k !== 'total'
                                 );
                                 return (

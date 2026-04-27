@@ -187,7 +187,7 @@ export const ProjectDetail = ({ project, onBack }) => {
       </div>
 
       {/* Zone supérieure scrollable (cover + objectifs) */}
-      <div className="incident-detail-top">
+      <div className="project-detail-top">
         <div className="detail-map-row">
           {/* Cover image (équivalent map) */}
           <div className="detail-map">

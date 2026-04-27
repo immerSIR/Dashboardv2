@@ -254,7 +254,7 @@ export const computeGlobalImpact = (incidents) => {
     totals.environmentHectares += inc.impacts.environment?.total || 0;
     totals.healthConsultations += inc.impacts.health?.total || 0;
     totals.regions.add(inc.region);
-    inc.organisations?.forEach((o) => totals.organisations.add(o));
+    inc.organisations.forEach((org) => totals.organisations.add(org));
     totalDays += inc.durationDays || 0;
   });
 

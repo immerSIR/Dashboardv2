@@ -27,6 +27,7 @@ import {
 } from 'iconsax-react';
 import { Header, Sidebar } from '../../components/layout';
 import { collaborations as allCollaborations } from './data/collaborations';
+import { CollaborationRequests } from '../collaboration-requests';
 import './collaboration.css';
 
 registerLocale('fr', fr);
@@ -54,6 +55,7 @@ const ROLE_OPTIONS = [
 export const Collaboration = ({ onLogout, user, activeNav, onNavChange }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [activeTab, setActiveTab] = useState('collaborations'); // 'collaborations' | 'requests'
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -436,18 +438,39 @@ export const Collaboration = ({ onLogout, user, activeNav, onNavChange }) => {
 
         <main className="collaboration-content">
           <div className="collab-page">
-            {/* Header */}
+            {/* Header avec tabs */}
             <div className="collab-page-header">
               <div>
-                <h1 className="collab-title">Mes collaborations</h1>
+                <h1 className="collab-title">Collaborations</h1>
                 <p className="collab-subtitle">
-                  Retrouvez toutes les actions auxquelles vous participez ou
-                  avez participé.
+                  Gérez vos collaborations actives et vos demandes de participation.
                 </p>
               </div>
-          
             </div>
 
+            {/* Tabs */}
+            <div className="collab-tabs">
+              <button
+                type="button"
+                className={`collab-tab ${activeTab === 'collaborations' ? 'is-active' : ''}`}
+                onClick={() => setActiveTab('collaborations')}
+              >
+                <People size={18} variant="Bold" />
+                Mes collaborations
+              </button>
+              <button
+                type="button"
+                className={`collab-tab ${activeTab === 'requests' ? 'is-active' : ''}`}
+                onClick={() => setActiveTab('requests')}
+              >
+                <TaskSquare size={18} variant="Bold" />
+                Demandes
+              </button>
+            </div>
+
+            {/* Contenu conditionnel */}
+            {activeTab === 'collaborations' ? (
+              <>
             {/* Toolbar */}
             <div className="collab-toolbar">
               <div className="collab-search">
@@ -699,6 +722,16 @@ export const Collaboration = ({ onLogout, user, activeNav, onNavChange }) => {
                   </article>
                 ))}
               </div>
+            )}
+              </>
+            ) : (
+              <CollaborationRequests
+                onLogout={onLogout}
+                user={user}
+                activeNav={activeNav}
+                onNavChange={onNavChange}
+                embedded={true}
+              />
             )}
           </div>
         </main>
@@ -1580,7 +1613,6 @@ export const Collaboration = ({ onLogout, user, activeNav, onNavChange }) => {
           </div>
         );
       })()}
-
     </div>
   );
 };

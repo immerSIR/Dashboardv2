@@ -65,10 +65,13 @@ export const CollaborationRequests = ({
   onLogout,
   user,
   activeNav,
-  onNavChange
+  onNavChange,
+  embedded = false
 }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Si embedded, on ne gère pas le layout complet
 
   const [requests, setRequests] = useState(allRequests);
   const [search, setSearch] = useState('');
@@ -157,32 +160,10 @@ export const CollaborationRequests = ({
     });
   }, [search, statusFilter, typeFilter, requests]);
 
-  return (
-    <div className="requests-layout">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        activeItem={activeNav}
-        onItemClick={onNavChange}
-        onCollapsedChange={setSidebarCollapsed}
-      />
-
-      <div
-        className={`requests-main ${
-          sidebarCollapsed ? 'sidebar-collapsed' : ''
-        }`}
-      >
-        <Header
-          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
-          user={user}
-          sidebarCollapsed={sidebarCollapsed}
-          onLogout={onLogout}
-          onNavChange={onNavChange}
-        />
-
-        <main className="requests-content">
-          <div className="requests-page">
-            {/* Header */}
+  const content = (
+    <>
+            {/* Header (seulement si non embedded) */}
+            {!embedded && (
             <div className="requests-page-header">
               <div>
                 <h1 className="requests-title">Demandes de collaboration</h1>
@@ -191,6 +172,7 @@ export const CollaborationRequests = ({
                 </p>
               </div>
             </div>
+            )}
 
             {/* Onglets type + direction */}
             <div className="requests-type-tabs">
@@ -610,9 +592,6 @@ export const CollaborationRequests = ({
                 })}
               </div>
             )}
-          </div>
-        </main>
-      </div>
 
       {/* Decision modal */}
       {decisionRequest && (
@@ -961,6 +940,42 @@ export const CollaborationRequests = ({
           </aside>
         </div>
       )}
+    </>
+  );
+
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <div className="requests-layout">
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        activeItem={activeNav}
+        onItemClick={onNavChange}
+        onCollapsedChange={setSidebarCollapsed}
+      />
+
+      <div
+        className={`requests-main ${
+          sidebarCollapsed ? 'sidebar-collapsed' : ''
+        }`}
+      >
+        <Header
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+          user={user}
+          sidebarCollapsed={sidebarCollapsed}
+          onLogout={onLogout}
+          onNavChange={onNavChange}
+        />
+
+        <main className="requests-content">
+          <div className="requests-page">
+            {content}
+          </div>
+        </main>
+      </div>
     </div>
   );
 };
