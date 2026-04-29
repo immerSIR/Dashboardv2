@@ -18,6 +18,11 @@ export const projects = [
     startDate: '15 Mars 2025',
     endDate: '30 Avril 2025',
     participantsCount: 24,
+    incidentStatus: 'analysis', // declared | analysis | taken | resolved
+    aiAnalysis: {
+      text: "Déployer une équipe d'assainissement en Zone B4 sous 24h. Risque élevé de transmission du paludisme et prévisions climatiques annonçant de fortes précipitations.",
+      audio: 'https://www2.cs.uic.edu/~i101/SoundFiles/CantinaBand3.wav'
+    },
     objectives: [
       'Nettoyer 5 km de berges du fleuve',
       'Sensibiliser 200 familles riveraines',
