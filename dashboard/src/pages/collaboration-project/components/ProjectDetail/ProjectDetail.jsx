@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Map, { Marker } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import {
@@ -17,7 +17,15 @@ import {
   Eye,
   Add,
   SearchNormal1,
-  Buildings2
+  Buildings2,
+  MagicStar,
+  Play,
+  Pause,
+  VolumeHigh,
+  Danger,
+  SearchStatus,
+  ClipboardTick,
+  ShieldTick
 } from 'iconsax-react';
 import './project-detail.css';
 
@@ -36,6 +44,22 @@ const AVAILABLE_ORGS = [
   { id: 'org-9', name: 'Save the Children', initials: 'SC', color: '#F97316' },
   { id: 'org-10', name: 'World Vision', initials: 'WV', color: '#6366F1' }
 ];
+
+// Étapes du statut d'un incident
+const INCIDENT_STATUS_STEPS = [
+  { id: 'declared', label: 'Déclaré', icon: Danger },
+  { id: 'analysis', label: 'Analyse', icon: SearchStatus },
+  { id: 'taken', label: 'Pris en compte', icon: ClipboardTick },
+  { id: 'resolved', label: 'Résolu', icon: ShieldTick }
+];
+
+// Formatte les secondes en mm:ss
+const formatTime = (seconds) => {
+  if (!seconds || isNaN(seconds)) return '0:00';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+};
 
 const ROLE_OPTIONS = [
   {
@@ -69,6 +93,58 @@ export const ProjectDetail = ({ project, onBack }) => {
   const [orgSearch, setOrgSearch] = useState('');
   const [showOrgDropdown, setShowOrgDropdown] = useState(false);
   const [selfRole, setSelfRole] = useState('contributeur');
+
+  // --- Audio IA ---
+  const audioRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const togglePlay = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (isPlaying) {
+      audio.pause();
+    } else {
+      audio.play();
+    }
+  };
+
+  const onAudioTimeUpdate = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    setCurrentTime(audio.currentTime);
+  };
+
+  const onAudioLoaded = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    setDuration(audio.duration);
+  };
+
+  const onAudioEnded = () => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+  };
+
+  const seekAudio = (e) => {
+    const audio = audioRef.current;
+    if (!audio || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+    audio.currentTime = Math.max(0, Math.min(duration, ratio * duration));
+  };
+
+  // Reset l'audio quand le projet change
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+  }, [project?.id]);
 
   const openJoinModal = () => {
     setJoinClosing(false);
@@ -222,6 +298,126 @@ export const ProjectDetail = ({ project, onBack }) => {
           </div>
         </div>
 
+        {/* Analyse IA de l'incident */}
+        <div className="detail-ai-analysis">
+          <h4 className="detail-section-label">
+             ANALYSE IA DE L'INCIDENT
+          </h4>
+          <p className="detail-ai-text">
+            {project.aiAnalysis?.text ||
+              "Déployer une équipe d'assainissement en Zone B4 sous 24h en raison du risque élevé de transmission du paludisme et des prévisions climatiques annonçant de fortes précipitations."}
+          </p>
+        </div>
+
+        {/* Lecteur audio (élément indépendant, toujours visible) */}
+        {(() => {
+          const audioSrc =
+            project.aiAnalysis?.audio ||
+            'https://www2.cs.uic.edu/~i101/SoundFiles/CantinaBand3.wav';
+          const progressPercent = duration ? (currentTime / duration) * 100 : 0;
+          return (
+            <div className="detail-audio">
+              <h4 className="detail-section-label">
+                 MESSAGE AUDIO
+              </h4>
+              <div className="detail-audio-player">
+                <button
+                  type="button"
+                  className="detail-audio-play-btn"
+                  onClick={togglePlay}
+                  aria-label={isPlaying ? 'Pause' : 'Lire'}
+                >
+                  {isPlaying ? (
+                    <Pause size={18} variant="Bold" color="#FFFFFF" />
+                  ) : (
+                    <Play size={18} variant="Bold" color="#FFFFFF" />
+                  )}
+                </button>
+                <div className="detail-audio-track">
+                  <div
+                    className="detail-audio-progress"
+                    onClick={seekAudio}
+                    role="slider"
+                    tabIndex={0}
+                    aria-label="Progression audio"
+                  >
+                    <div
+                      className="detail-audio-progress-fill"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                  <div className="detail-audio-times">
+                    <span>{formatTime(currentTime)}</span>
+                    <span>{formatTime(duration)}</span>
+                  </div>
+                </div>
+                <audio
+                  ref={audioRef}
+                  src={audioSrc}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  onTimeUpdate={onAudioTimeUpdate}
+                  onLoadedMetadata={onAudioLoaded}
+                  onEnded={onAudioEnded}
+                  preload="metadata"
+                />
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Statut de l'incident */}
+        {(() => {
+          const currentStatus = project.incidentStatus || 'analysis';
+          const currentIndex = INCIDENT_STATUS_STEPS.findIndex(
+            (s) => s.id === currentStatus
+          );
+          const validIndex = currentIndex === -1 ? 0 : currentIndex;
+
+          return (
+            <div className="detail-incident-status">
+              <h4 className="detail-section-label">
+                 STATUT DE L'INCIDENT
+              </h4>
+              <div className="incident-status-stepper">
+                <div className="incident-status-bar">
+                  {INCIDENT_STATUS_STEPS.map((step, idx) => {
+                    const isDone = idx < validIndex;
+                    const isCurrent = idx === validIndex;
+                    return (
+                      <div
+                        key={step.id}
+                        className={`incident-status-segment ${
+                          isDone ? 'is-done' : ''
+                        } ${isCurrent ? 'is-current' : ''}`}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="incident-status-steps">
+                  {INCIDENT_STATUS_STEPS.map((step, idx) => {
+                    const isDone = idx < validIndex;
+                    const isCurrent = idx === validIndex;
+                    return (
+                      <div
+                        key={step.id}
+                        className={`incident-status-step ${
+                          isDone ? 'is-done' : ''
+                        } ${isCurrent ? 'is-current' : ''}`}
+                      >
+                        <span className="incident-status-dot" />
+                        <span className="incident-status-label">
+                          {step.label.toUpperCase()}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Description */}
         <div className="detail-description">
           <h4 className="detail-section-label">DESCRIPTION</h4>
@@ -232,8 +428,7 @@ export const ProjectDetail = ({ project, onBack }) => {
         {project.video && (
           <div className="detail-video">
             <h4 className="detail-section-label">
-              <VideoSquare size={16} variant="Bold" color="#3AA2DD" />
-              VIDÉO DE PRÉSENTATION
+               VIDÉO DE PRÉSENTATION
             </h4>
             <div className="detail-video-frame">
               <iframe
@@ -251,8 +446,7 @@ export const ProjectDetail = ({ project, onBack }) => {
         {project.coordinates && (
           <div className="detail-geo">
             <h4 className="detail-section-label">
-              <MapIcon size={16} variant="Bold" color="#3AA2DD" />
-              GÉOLOCALISATION
+               GÉOLOCALISATION
             </h4>
             <div className="detail-geo-info">
               <Location size={16} variant="Bold" color="#3AA2DD" />
