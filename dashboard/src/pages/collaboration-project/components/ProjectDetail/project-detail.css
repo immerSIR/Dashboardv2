@@ -1158,3 +1158,194 @@
     font-size: 18px;
   }
 }
+
+/* ============================================
+   ANALYSE IA DE L'INCIDENT
+   ============================================ */
+.project-detail .detail-ai-analysis {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-4);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  
+}
+
+.project-detail .detail-ai-text {
+  margin: 0;
+  font-size: var(--font-size-body-small);
+  color: var(--color-text-primary);
+  line-height: 1.55;
+}
+
+/* ============================================
+   LECTEUR AUDIO (indépendant)
+   ============================================ */
+.project-detail .detail-audio {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-4);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.project-detail .detail-audio-player {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-2) var(--spacing-3);
+}
+
+.project-detail .detail-audio-play-btn {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: #3AA2DD;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.project-detail .detail-audio-play-btn:hover {
+  background: #2B8BC2;
+}
+
+.project-detail .detail-audio-play-btn:active {
+  transform: scale(0.95);
+}
+
+.project-detail .detail-audio-track {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.project-detail .detail-audio-progress {
+  height: 5px;
+  width: 100%;
+  background: var(--color-border);
+  border-radius: 999px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.project-detail .detail-audio-progress-fill {
+  height: 100%;
+  background: #3AA2DD;
+  border-radius: 999px;
+  transition: width 0.1s linear;
+}
+
+.project-detail .detail-audio-times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================
+   STATUT DE L'INCIDENT (stepper)
+   ============================================ */
+.project-detail .detail-incident-status {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-4);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.project-detail .incident-status-stepper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.project-detail .incident-status-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.project-detail .incident-status-segment {
+  height: 6px;
+  background-color: var(--color-border);
+  border-radius: 999px;
+  transition: background-color 0.3s ease;
+}
+
+.project-detail .incident-status-segment.is-done {
+  background-color: #22C55E;
+}
+
+.project-detail .incident-status-segment.is-current {
+  background-color: #3AA2DD;
+}
+
+.project-detail .incident-status-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.project-detail .incident-status-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.project-detail .incident-status-step.is-done {
+  color: #22C55E;
+}
+
+.project-detail .incident-status-step.is-current {
+  color: #3AA2DD;
+}
+
+.project-detail .incident-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+.project-detail .incident-status-step.is-current .incident-status-dot {
+  box-shadow: 0 0 0 4px rgba(58, 162, 221, 0.18);
+}
+
+.project-detail .incident-status-label {
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+}
+
+.project-detail .incident-status-step.is-current .incident-status-label {
+  font-weight: var(--font-weight-bold);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .project-detail .incident-status-label {
+    font-size: 9px;
+    letter-spacing: 0.04em;
+  }
+}
