@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
 import Map, { Marker } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -85,6 +86,19 @@ const MAP_STYLES = {
 export const MapContainer = ({ incidents = [], isLoading = false }) => {
   const [selectedIncidentId, setSelectedIncidentId] = useState(null);
   const [modalClosing, setModalClosing] = useState(false);
+  const navigate = useNavigate();
+
+  // Bloquer le scroll du body quand le modal est ouvert
+  useEffect(() => {
+    if (selectedIncidentId) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [selectedIncidentId]);
   const [activeStyle, setActiveStyle] = useState('humanitarian');
 
   // Utiliser useSWR pour récupérer les détails de l'incident sélectionné
@@ -93,7 +107,7 @@ export const MapContainer = ({ incidents = [], isLoading = false }) => {
     () => getIncidentService(selectedIncidentId),
     {
       revalidateOnFocus: false,
-      dedupingInterval: 300000, // 5 minutes
+    
       onError: (err) => {
         console.error('[MAP] Erreur chargement incident:', err);
       },
@@ -368,7 +382,6 @@ export const MapContainer = ({ incidents = [], isLoading = false }) => {
               {/* Méta-données */}
               <div className="incident-modal-meta">
                 <div className="incident-modal-meta-row">
-                  <Calendar size={16} variant="Bold" color="var(--color-primary)" />
                   <span>
                     <strong>Créé le :</strong>{' '}
                     {new Date(selectedIncident.created_at).toLocaleDateString('fr-FR', {
@@ -381,8 +394,8 @@ export const MapContainer = ({ incidents = [], isLoading = false }) => {
                   </span>
                 </div>
                 <div className="incident-modal-meta-row">
-                  <Location size={16} variant="Bold" color="var(--color-primary)" />
                   <span>
+                    <strong>Coordonnées :</strong>{' '}
                     {parseFloat(selectedIncident.lattitude).toFixed(4)}°N,{' '}
                     {parseFloat(selectedIncident.longitude).toFixed(4)}°E
                   </span>
@@ -425,7 +438,6 @@ export const MapContainer = ({ incidents = [], isLoading = false }) => {
               {selectedIncident.audio && (
                 <div className="incident-modal-section">
                   <h4 className="incident-modal-section-label">
-                    <MagicStar size={14} variant="Bold" color="var(--color-primary)" />
                     AUDIO
                   </h4>
                   <audio controls style={{ width: '100%' }}>
@@ -439,7 +451,6 @@ export const MapContainer = ({ incidents = [], isLoading = false }) => {
               {selectedIncident.video && (
                 <div className="incident-modal-section">
                   <h4 className="incident-modal-section-label">
-                    <VideoSquare size={14} variant="Bold" color="var(--color-primary)" />
                     VIDÉO DE PRÉSENTATION
                   </h4>
                   <div className="incident-modal-video">
@@ -487,6 +498,15 @@ export const MapContainer = ({ incidents = [], isLoading = false }) => {
                       </div>
                     )}
                   </div>
+                  
+                  {/* Bouton Savoir plus */}
+                  <button
+                    type="button"
+                    className="incident-modal-more-btn"
+                    onClick={() => navigate(`/incident/${selectedIncident.id}`)}
+                  >
+                    Savoir plus
+                  </button>
                 </div>
               )}
                 </>

@@ -112,7 +112,7 @@
   position: fixed;
   inset: 0;
   background-color: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
+  z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -731,5 +731,102 @@
   }
   100% {
     background-position: -200% 0;
+  }
+}
+
+/* ============================================
+   BOUTON SAVOIR PLUS
+   ============================================ */
+.incident-modal-more-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: var(--spacing-4);
+  padding: var(--spacing-3) var(--spacing-4);
+  background-color: transparent;
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.incident-modal-more-btn:hover {
+  background-color: var(--color-primary);
+  color: #FFFFFF;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(58, 162, 221, 0.3);
+}
+
+/* ============================================
+   RESPONSIVE MOBILE
+   ============================================ */
+@media (max-width: 768px) {
+  .incident-modal {
+    width: 100%;
+  }
+
+  .incident-modal-title {
+    font-size: 1.25rem;
+  }
+
+  .incident-modal-subtitle {
+    font-size: 0.9rem;
+  }
+
+  .incident-modal-body {
+    padding: var(--spacing-4);
+    gap: var(--spacing-4);
+  }
+
+  .incident-modal-header {
+    padding: var(--spacing-4);
+  }
+
+  /* Agrandir les badges */
+  .incident-modal-badge {
+    font-size: 0.8rem;
+    padding: 8px 14px;
+  }
+
+  /* Agrandir les méta-données */
+  .incident-modal-meta-row {
+    font-size: 0.95rem;
+  }
+
+  .incident-modal-meta-row strong {
+    font-size: 0.95rem;
+  }
+
+  /* Agrandir les labels de section */
+  .incident-modal-section-label {
+    font-size: 0.85rem;
+  }
+
+  /* Agrandir les organisations */
+  .incident-modal-org-avatar {
+    width: 42px;
+    height: 42px;
+    font-size: 0.9rem;
+  }
+
+  .incident-modal-org-name {
+    font-size: 0.95rem;
+  }
+
+  /* Agrandir les étapes de statut */
+  .incident-modal-status-step span:last-child {
+    font-size: 0.7rem;
+  }
+
+  /* Bouton savoir plus */
+  .incident-modal-more-btn {
+    padding: var(--spacing-4);
+    font-size: 1rem;
   }
 }
