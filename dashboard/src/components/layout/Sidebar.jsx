@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Element4, People, ProfileCircle, Clock, Briefcase, Award } from 'iconsax-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Element4, People, ProfileCircle, Clock, Briefcase, Award, Trash, Buildings2, Profile2User } from 'iconsax-react';
 import logoMapAction from '../../assets/logo.svg';
 import logoMapActionMin from '../../assets/logo-min.svg';
 import './sidebar.css';
@@ -10,52 +11,79 @@ import {
   People as IconsaxPeople  
 } from 'iconsax-react';
  
-export const Sidebar = ({ isOpen, onClose, activeItem, onItemClick, onCollapsedChange }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+export const Sidebar = ({ isOpen, onClose, isCollapsed: controlledCollapsed, onCollapsedChange }) => {
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
+  const isCollapsed = controlledCollapsed !== undefined ? controlledCollapsed : internalCollapsed;
+  const setIsCollapsed = onCollapsedChange ? (val) => onCollapsedChange(val) : setInternalCollapsed;
+  
+  const navigate = useNavigate();
+  const location = useLocation();
   
   const handleToggleCollapsed = () => {
     const newCollapsedState = !isCollapsed;
     setIsCollapsed(newCollapsedState);
-    if (onCollapsedChange) {
-      onCollapsedChange(newCollapsedState);
-    }
   };
   const navItems = [
     {
       id: 'dashboard',
       label: 'Dashboard',
-      icon: Element4
+      icon: Element4,
+      path: '/dashboard'
     },
     {
       id: 'collaboration',
       label: 'Collaborations',
       icon: IconsaxPeople,
+      path: '/collaboration'
     },
     {
-      id: 'projects',
+      id: 'incidents',
       label: 'Incidents',
-      icon: Briefcase
+      icon: Briefcase,
+      path: '/incidents'
+    },
+    {
+      id: 'organisations',
+      label: 'Organisations',
+      icon: Buildings2,
+      path: '/organisations'
+    },
+    {
+      id: 'agents',
+      label: 'Agents',
+      icon: Profile2User,
+      path: '/agents'
     },
     {
       id: 'impact',
       label: 'Impact',
-      icon: Award
+      icon: Award,
+      path: '/impact'
     },
   
- 
+
     {
       id: 'profile',
       label: 'Mon profil',
-      icon: User
+      icon: User,
+      path: '/profile'
+    },
+    {
+      id: 'trash',
+      label: 'Corbeille',
+      icon: Trash,
+      path: '/trash'
     }
   ];
 
-  const handleItemClick = (itemId) => {
-    onItemClick(itemId);
+  const handleItemClick = (path) => {
+    navigate(path);
     if (window.innerWidth < 1024) {
       onClose();
     }
   };
+
+  const isActive = (path) => location.pathname === path;
 
   return (
     <>
@@ -109,9 +137,9 @@ export const Sidebar = ({ isOpen, onClose, activeItem, onItemClick, onCollapsedC
           {navItems.map((item) => (
             <button
               key={item.id}
-              className={`sidebar-item ${activeItem === item.id ? 'active' : ''}`}
-              onClick={() => handleItemClick(item.id)}
-              aria-current={activeItem === item.id ? 'page' : undefined}
+              className={`sidebar-item ${isActive(item.path) ? 'active' : ''}`}
+              onClick={() => handleItemClick(item.path)}
+              aria-current={isActive(item.path) ? 'page' : undefined}
             >
               <span className="sidebar-icon">
                 <item.icon size={20} variant="Bold" />

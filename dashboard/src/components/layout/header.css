@@ -279,6 +279,48 @@
   position: relative;
 }
 
+.header-profile {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  background-color: var(--color-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-profile:hover {
+  transform: scale(1.05);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(58, 162, 221, 0.1);
+}
+
+.header-profile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.header-profile-fallback {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-primary);
+  color: var(--color-surface);
+}
+
 .user-avatar {
   width: 34px;
   height: 34px;

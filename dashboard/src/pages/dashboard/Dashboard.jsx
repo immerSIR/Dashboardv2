@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import useSWR from 'swr';
+import { useSidebarState } from '../../hooks/useSidebarState';
 import { Clock, CloseCircle } from 'iconsax-react';
 import { Header, Sidebar } from '../../components/layout';
 import MetricsCards from './components/metrics/MetricsCards';
@@ -6,13 +8,36 @@ import MapContainer from './components/map/MapContainer';
 import StatsWidgets from './components/widgets/StatsWidgets';
 import ActivityPanel from './components/activity/ActivityPanel';
 import './dashboard.css';
+import { getIncidentsService } from './service/dashboard_service';
 
-export const Dashboard = ({ onLogout, user, activeNav = 'dashboard', onNavChange }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const setActiveNav = onNavChange || (() => {});
+export const Dashboard = () => {
+  const {
+    isOpen: sidebarOpen,
+    setOpen: setSidebarOpen,
+    isCollapsed: sidebarCollapsed,
+    setCollapsed: setSidebarCollapsed,
+  } = useSidebarState();
   const [activityModalOpen, setActivityModalOpen] = useState(false);
   const [activityModalClosing, setActivityModalClosing] = useState(false);
+
+  // Utiliser useSWR pour récupérer les incidents
+  const { data: incidents = [], isLoading: isLoadingIncidents, error } = useSWR(
+    '/incidents/all',
+    () => getIncidentsService('all'),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
+      dedupingInterval: 60000, // 1 minute
+      errorRetryCount: 3,
+      errorRetryInterval: 2000,
+      onError: (err) => {
+        console.error('[DASHBOARD] Erreur chargement incidents:', err);
+      },
+      onSuccess: (data) => {
+        console.log('[DASHBOARD] Incidents chargés:', data);
+      }
+    }
+  );
 
   const openActivityModal = () => {
     setActivityModalOpen(true);
@@ -27,14 +52,14 @@ export const Dashboard = ({ onLogout, user, activeNav = 'dashboard', onNavChange
     }, 250);
   };
 
+
   return (
     <div className="dashboard-layout">
       {/* Sidebar gauche */}
-      <Sidebar 
+      <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        activeItem={activeNav}
-        onItemClick={setActiveNav}
+        isCollapsed={sidebarCollapsed}
         onCollapsedChange={setSidebarCollapsed}
       />
       
@@ -43,17 +68,15 @@ export const Dashboard = ({ onLogout, user, activeNav = 'dashboard', onNavChange
         {/* Header */}
         <Header 
           onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
-          user={user}
+          isCollapsed={sidebarCollapsed}
           sidebarCollapsed={sidebarCollapsed}
-          onLogout={onLogout}
-          onNavChange={onNavChange}
         />
         
         {/* Zone centrale avec scroll */}
         <main className="dashboard-content py-5 mt-5">
           <div className="dashboard-grid">
             {/* Carte en premier (grande) */}
-            <MapContainer />
+            <MapContainer incidents={incidents} isLoading={isLoadingIncidents} />
             
             {/* 3 cartes métriques */}
             <MetricsCards />

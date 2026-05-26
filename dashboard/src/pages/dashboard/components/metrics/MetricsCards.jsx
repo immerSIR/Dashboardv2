@@ -20,7 +20,7 @@ export const MetricsCards = () => {
     },
     {
       id: 'pending-audit',
-      label: 'Audit IA en attente',
+      label: 'Incidents résolus',
       value: '15',
       color: 'warning',
       icon: <Cpu size={24} variant="Bold" color="#F59E0B" />

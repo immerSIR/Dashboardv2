@@ -1,4 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import useSWR from 'swr';
+import { useSidebarState } from '../../hooks/useSidebarState';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import { fr } from 'date-fns/locale/fr';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -28,6 +31,8 @@ import {
 import { Header, Sidebar } from '../../components/layout';
 import { collaborations as allCollaborations } from './data/collaborations';
 import { CollaborationRequests } from '../collaboration-requests';
+import { getCollaborationsService } from './service/collaboration_service';
+import { ShimmerThumbnail, ShimmerTitle, ShimmerText } from 'react-shimmer-effects';
 import './collaboration.css';
 
 registerLocale('fr', fr);
@@ -52,9 +57,14 @@ const ROLE_OPTIONS = [
   { id: 'observateur', label: 'Observateur', icon: Eye, color: '#6C7278', description: 'Suit l\'avancement' }
 ];
 
-export const Collaboration = ({ onLogout, user, activeNav, onNavChange }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+export const Collaboration = () => {
+  const navigate = useNavigate();
+  const {
+    isOpen: sidebarOpen,
+    setOpen: setSidebarOpen,
+    isCollapsed: sidebarCollapsed,
+    setCollapsed: setSidebarCollapsed,
+  } = useSidebarState();
   const [activeTab, setActiveTab] = useState('collaborations'); // 'collaborations' | 'requests'
 
   const [search, setSearch] = useState('');
@@ -104,20 +114,81 @@ export const Collaboration = ({ onLogout, user, activeNav, onNavChange }) => {
     return () => mq.removeEventListener('change', update);
   }, []);
 
+  // Utiliser useSWR pour charger les collaborations
+  const { data: swrData, error: swrError, isLoading, mutate } = useSWR(
+    'collaborations',
+    getCollaborationsService,
+    {
+      revalidateOnFocus: false
+    }
+  );
+
+  let shimmerColor = "#acb7c6"
+
+  // Mapper les données API vers le format attendu par le composant
+  const collaborations = useMemo(() => {
+    if (!swrData) return [];
+
+    return swrData.map(collab => {
+      const createdDate = new Date(collab.created_at);
+      const endDate = collab.end_date ? new Date(collab.end_date) : null;
+
+      return {
+        id: collab.id,
+        userRole: collab.role,
+        title: `Incident #${collab.incident}`,
+        incidentId: collab.incident,
+        userId: collab.user,
+        status: collab.status,
+        createdAt: collab.created_at,
+        motivation: collab.motivation,
+        endDate: collab.end_date,
+        otherOption: collab.other_option,
+        image: '',
+        organisation: `Utilisateur #${collab.user}`,
+        role: collab.role,
+        joinedAt: createdDate.toLocaleDateString('fr-FR', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        }),
+        startDate: createdDate.toLocaleDateString('fr-FR', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric'
+        }),
+        endDate: endDate ? endDate.toLocaleDateString('fr-FR', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric'
+        }) : 'Non défini',
+        startAt: collab.created_at,
+        endAt: collab.end_date,
+        location: 'À définir',
+        description: collab.motivation || 'Aucune description',
+        progress: 0,
+        tasks: []
+      };
+    });
+  }, [swrData]);
+
+  // Filtres locaux pour recherche, statut et dates
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
 
-    return allCollaborations.filter((c) => {
+    return collaborations.filter((c) => {
+      // Filtre statut
       if (statusFilter !== 'all' && c.status !== statusFilter) return false;
 
-      // Filtre période : on garde les collab dont la période chevauche [from, to]
+      // Filtre période
       if (dateFrom || dateTo) {
-        const cStart = new Date(c.startAt);
-        const cEnd = new Date(c.endAt);
-        if (dateFrom && cEnd < dateFrom) return false;
-        if (dateTo && cStart > dateTo) return false;
+        const cStart = c.startAt ? new Date(c.startAt) : null;
+        const cEnd = c.endAt ? new Date(c.endAt) : null;
+        if (dateFrom && cEnd && cEnd < dateFrom) return false;
+        if (dateTo && cStart && cStart > dateTo) return false;
       }
 
+      // Filtre recherche
       if (!q) return true;
       return (
         c.title.toLowerCase().includes(q) ||
@@ -126,9 +197,13 @@ export const Collaboration = ({ onLogout, user, activeNav, onNavChange }) => {
         c.location.toLowerCase().includes(q)
       );
     });
-  }, [search, statusFilter, dateFrom, dateTo]);
+  }, [collaborations, search, statusFilter, dateFrom, dateTo]);
 
   const resetDateRange = () => setDateRange([null, null]);
+
+  const openCollabDetail = (collab) => {
+    navigate(`/collaboration-detail/${collab.id}`);
+  };
 
   const openTasksModal = (collab) => {
     setSelectedCollab(collab);
@@ -290,13 +365,13 @@ export const Collaboration = ({ onLogout, user, activeNav, onNavChange }) => {
       [collabId]: prev[collabId].map(task =>
         task.id === taskId
           ? {
-              ...task,
-              completed: !task.completed,
-              completedAt: !task.completed ? new Date().toISOString() : null,
-              failed: false,
-              failedAt: null,
-              failureReason: null
-            }
+            ...task,
+            completed: !task.completed,
+            completedAt: !task.completed ? new Date().toISOString() : null,
+            failed: false,
+            failedAt: null,
+            failureReason: null
+          }
           : task
       )
     }));
@@ -308,13 +383,13 @@ export const Collaboration = ({ onLogout, user, activeNav, onNavChange }) => {
       [collabId]: prev[collabId].map(task =>
         task.id === taskId
           ? {
-              ...task,
-              failed: true,
-              failedAt: new Date().toISOString(),
-              failureReason: reason,
-              completed: false,
-              completedAt: null
-            }
+            ...task,
+            failed: true,
+            failedAt: new Date().toISOString(),
+            failureReason: reason,
+            completed: false,
+            completedAt: null
+          }
           : task
       )
     }));
@@ -326,13 +401,13 @@ export const Collaboration = ({ onLogout, user, activeNav, onNavChange }) => {
       [collabId]: prev[collabId].map(task =>
         task.id === taskId
           ? {
-              ...task,
-              failed: false,
-              failedAt: null,
-              failureReason: null,
-              completed: false,
-              completedAt: null
-            }
+            ...task,
+            failed: false,
+            failedAt: null,
+            failureReason: null,
+            completed: false,
+            completedAt: null
+          }
           : task
       )
     }));
@@ -342,15 +417,15 @@ export const Collaboration = ({ onLogout, user, activeNav, onNavChange }) => {
     // Simuler l'upload de fichier
     const fileType = file.type.startsWith('image/') ? 'image' : 'video';
     const fakeUrl = URL.createObjectURL(file);
-    
+
     setCollabTasks(prev => ({
       ...prev,
       [collabId]: prev[collabId].map(task =>
         task.id === taskId
           ? {
-              ...task,
-              proof: { type: fileType, url: fakeUrl }
-            }
+            ...task,
+            proof: { type: fileType, url: fakeUrl }
+          }
           : task
       )
     }));
@@ -418,22 +493,17 @@ export const Collaboration = ({ onLogout, user, activeNav, onNavChange }) => {
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        activeItem={activeNav}
-        onItemClick={onNavChange}
+        isCollapsed={sidebarCollapsed}
         onCollapsedChange={setSidebarCollapsed}
       />
 
       <div
-        className={`collaboration-main ${
-          sidebarCollapsed ? 'sidebar-collapsed' : ''
-        }`}
+        className={`collaboration-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''
+          }`}
       >
         <Header
           onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
-          user={user}
           sidebarCollapsed={sidebarCollapsed}
-          onLogout={onLogout}
-          onNavChange={onNavChange}
         />
 
         <main className="collaboration-content">
@@ -471,267 +541,282 @@ export const Collaboration = ({ onLogout, user, activeNav, onNavChange }) => {
             {/* Contenu conditionnel */}
             {activeTab === 'collaborations' ? (
               <>
-            {/* Toolbar */}
-            <div className="collab-toolbar">
-              <div className="collab-search">
-                <SearchNormal1 size={18} variant="Linear" color="#6C7278" />
-                <input
-                  type="text"
-                  placeholder="Rechercher par titre, organisation, lieu..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-
-              <div className="collab-filters">
-                      {/* Filtre par période */}
-              <div className="collab-date-range">
-                <Calendar size={16} variant="Bold" color="#3AA2DD" />
-                <span className="collab-date-label">Période :</span>
-                <DatePicker
-                  selectsRange
-                  startDate={dateFrom}
-                  endDate={dateTo}
-                  onChange={(update) => setDateRange(update)}
-                  locale="fr"
-                  dateFormat="dd MMM yyyy"
-                  placeholderText={
-                    isMobile ? 'Période…' : 'Sélectionner une période…'
-                  }
-                  isClearable={false}
-                  monthsShown={isMobile ? 1 : 2}
-                  withPortal={isMobile}
-                  shouldCloseOnSelect={!isMobile}
-                  className="collab-date-input"
-                  calendarClassName="collab-datepicker"
-                  popperClassName="collab-datepicker-popper"
-                  portalId="collab-datepicker-portal"
-                />
-                {(dateFrom || dateTo) && (
-                  <button
-                    type="button"
-                    className="collab-date-clear"
-                    onClick={resetDateRange}
-                    aria-label="Réinitialiser la période"
-                    title="Réinitialiser"
-                  >
-                    <CalendarRemove
-                      size={16}
-                      variant="Bold"
-                      color="#EF4444"
+                {/* Toolbar */}
+                <div className="collab-toolbar">
+                  <div className="collab-search">
+                    <SearchNormal1 size={18} variant="Linear" color="#6C7278" />
+                    <input
+                      type="text"
+                      placeholder="Rechercher par titre, organisation, lieu..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
                     />
-                  </button>
-                )}
-              </div>
-                <button
-                  type="button"
-                  className={`collab-filter-pill ${
-                    statusFilter === 'all' ? 'is-active' : ''
-                  }`}
-                  onClick={() => setStatusFilter('all')}
-                >
-                  Toutes
-                  <span className="collab-filter-count">{counts.all}</span>
-                </button>
-                <button
-                  type="button"
-                  className={`collab-filter-pill ${
-                    statusFilter === 'in-progress' ? 'is-active' : ''
-                  }`}
-                  onClick={() => setStatusFilter('in-progress')}
-                >
-                  En cours
-                  <span className="collab-filter-count">
-                    {counts['in-progress']}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  className={`collab-filter-pill ${
-                    statusFilter === 'completed' ? 'is-active' : ''
-                  }`}
-                  onClick={() => setStatusFilter('completed')}
-                >
-                  Terminées
-                  <span className="collab-filter-count">
-                    {counts.completed}
-                  </span>
-                </button>
+                  </div>
 
-                <div className="collab-select">
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    aria-label="Filtrer par statut"
-                  >
-                    <option value="all">Tous les statuts</option>
-                    <option value="in-progress">En cours</option>
-                    <option value="completed">Terminées</option>
-                  </select>
-                  <ArrowDown2 size={16} variant="Linear" color="#6C7278" />
-                </div>
-              </div>
-
-        
-            </div>
-
-            {/* Liste */}
-            {filtered.length === 0 ? (
-              <div className="collab-empty">
-                <p>Aucune collaboration ne correspond à vos critères.</p>
-              </div>
-            ) : (
-              <div className="collab-grid">
-                {filtered.map((c) => (
-                  <article
-                    key={c.id}
-                    className={`collab-card ${isMobile ? 'is-mobile-clickable' : ''}`}
-                    onClick={isMobile ? () => openMobileSheet(c) : undefined}
-                    role={isMobile ? 'button' : undefined}
-                    tabIndex={isMobile ? 0 : undefined}
-                  >
-                    <div
-                      className="collab-card-cover"
-                      style={{ backgroundImage: `url(${c.image})` }}
-                    >
-                      <span
-                        className={`collab-status-badge collab-status-${c.status}`}
-                      >
-                        {c.status === 'completed' ? (
-                          <>
-                            <TickCircle
-                              size={14}
-                              variant="Bold"
-                              color="#FFFFFF"
-                            />
-                            Terminée
-                          </>
-                        ) : (
-                          <>
-                            <Clock size={14} variant="Bold" color="#FFFFFF" />
-                            En cours
-                          </>
-                        )}
-                      </span>
-                    </div>
-
-                    <div className="collab-card-body">
-                      <div className="collab-card-org">{c.organisation}</div>
-                      <h3 className="collab-card-title">{c.title}</h3>
-   {/* Badge de rôle */}
-                      {c.userRole && (
-                        <div className={`collab-role-badge collab-role-${c.userRole}`}>
-                          {c.userRole === 'leader' && <Crown1 size={12} variant="Bold" color="#F59E0B" />}
-                          {c.userRole === 'contributeur' && <People size={12} variant="Bold" color="#3AA2DD" />}
-                          {c.userRole === 'observateur' && <Eye size={12} variant="Bold" color="#6C7278" />}
-                          <span>Votre rôle : {c.userRole.charAt(0).toUpperCase() + c.userRole.slice(1)}</span>
-                        </div>
-                      )}                      
-                      <p className="collab-card-desc">{c.description}</p>
-
-                      <div className="collab-card-meta">
-                        <div className="collab-meta-row">
-                          <Location
-                            size={14}
-                            variant="Bold"
-                            color="#6C7278"
-                          />
-                          <span>{c.location}</span>
-                        </div>
-                        <div className="collab-meta-row">
-                          <Calendar
-                            size={14}
-                            variant="Bold"
-                            color="#6C7278"
-                          />
-                          <span>
-                            {c.startDate} → {c.endDate}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="collab-progress">
-                        <div className="collab-progress-head">
-                          <span>Progression</span>
-                          <span className="collab-progress-value">
-                            {getSavedProgress(c)}%
-                          </span>
-                        </div>
-                        <div className="collab-progress-bar">
-                          <div
-                            className={`collab-progress-fill collab-progress-${isCollabClosed(c.id) ? 'completed' : c.status}`}
-                            style={{ width: `${getSavedProgress(c)}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      {isCollabClosed(c.id) && (
-                        <div className="collab-closed-badge">
-                          <Lock1 size={14} variant="Bold" color="#FFFFFF" />
-                          Collaboration clôturée
-                        </div>
-                      )}
-
-                      {!isMobile && c.tasks && c.tasks.length > 0 && (
+                  <div className="collab-filters">
+                    {/* Filtre par période */}
+                    <div className="collab-date-range">
+                      <Calendar size={16} variant="Bold" color="#3AA2DD" />
+                      <span className="collab-date-label">Période :</span>
+                      <DatePicker
+                        selectsRange
+                        startDate={dateFrom}
+                        endDate={dateTo}
+                        onChange={(update) => setDateRange(update)}
+                        locale="fr"
+                        dateFormat="dd MMM yyyy"
+                        placeholderText={
+                          isMobile ? 'Période…' : 'Sélectionner une période…'
+                        }
+                        isClearable={false}
+                        monthsShown={isMobile ? 1 : 2}
+                        withPortal={isMobile}
+                        shouldCloseOnSelect={!isMobile}
+                        className="collab-date-input"
+                        calendarClassName="collab-datepicker"
+                        popperClassName="collab-datepicker-popper"
+                        portalId="collab-datepicker-portal"
+                      />
+                      {(dateFrom || dateTo) && (
                         <button
                           type="button"
-                          className="collab-tasks-btn"
-                          onClick={() => openTasksModal(c)}
+                          className="collab-date-clear"
+                          onClick={resetDateRange}
+                          aria-label="Réinitialiser la période"
+                          title="Réinitialiser"
                         >
-                          <TaskSquare size={16} variant="Bold" color="#FFFFFF" />
-                          Voir les tâches ({(collabTasks[c.id] || c.tasks).filter(t => t.completed).length}/{c.tasks.length})
+                          <CalendarRemove
+                            size={16}
+                            variant="Bold"
+                            color="#EF4444"
+                          />
                         </button>
                       )}
-
-                      {/* Actions secondaires - desktop uniquement */}
-                      {!isMobile && !isCollabClosed(c.id) && (
-                        <div className="collab-actions-row">
-                          <button
-                            type="button"
-                            className="collab-action-btn collab-action-add-task"
-                            onClick={() => openAddTaskModal(c)}
-                            title="Ajouter une tâche"
-                          >
-                            <Add size={16} variant="Bold" color="#3AA2DD" />
-                            Ajouter une tâche
-                          </button>
-                          {c.userRole === 'leader' && (
-                            <button
-                              type="button"
-                              className="collab-action-btn collab-action-suggest"
-                              onClick={() => openSuggestOrgModal(c)}
-                              title="Suggérer des organisations"
-                            >
-                              <Buildings2 size={16} variant="Bold" color="#F59E0B" />
-                              Suggérer des organisations
-                            </button>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Indicateur "Tap pour voir les actions" mobile */}
-                      {isMobile && (
-                        <div className="collab-mobile-hint">
-                          <TaskSquare size={14} variant="Bold" color="#3AA2DD" />
-                          Touchez pour voir les actions
-                        </div>
-                      )}
-
-                    
                     </div>
-                  </article>
-                ))}
-              </div>
-            )}
+                    <button
+                      type="button"
+                      className={`collab-filter-pill ${statusFilter === 'all' ? 'is-active' : ''
+                        }`}
+                      onClick={() => setStatusFilter('all')}
+                    >
+                      Toutes
+                      <span className="collab-filter-count">{counts.all}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`collab-filter-pill ${statusFilter === 'in-progress' ? 'is-active' : ''
+                        }`}
+                      onClick={() => setStatusFilter('in-progress')}
+                    >
+                      En cours
+                      <span className="collab-filter-count">
+                        {counts['in-progress']}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`collab-filter-pill ${statusFilter === 'completed' ? 'is-active' : ''
+                        }`}
+                      onClick={() => setStatusFilter('completed')}
+                    >
+                      Terminées
+                      <span className="collab-filter-count">
+                        {counts.completed}
+                      </span>
+                    </button>
+
+                    <div className="collab-select">
+                      <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        aria-label="Filtrer par statut"
+                      >
+                        <option value="all">Tous les statuts</option>
+                        <option value="in-progress">En cours</option>
+                        <option value="completed">Terminées</option>
+                      </select>
+                      <ArrowDown2 size={16} variant="Linear" color="#6C7278" />
+                    </div>
+                  </div>
+
+
+                </div>
+
+                {/* État de chargement avec react-shimmer-effects */}
+                {isLoading && (
+                  <div className="collab-grid">
+                    {[...Array(6)].map((_, idx) => (
+                      <article key={idx} className="collab-card" style={{ cursor: 'default' }}>
+                        <ShimmerThumbnail height={180} rounded className="m-0"  />
+                        <div className="collab-card-body" style={{ padding: '20px' }}>
+                          {/* Org name shimmer */}
+                          <div style={{ width: '120px', marginBottom: '8px' }}>
+                            <ShimmerText line={1} gap={0} />
+                          </div>
+
+                          {/* Title shimmer */}
+                          <div style={{ width: '100%', marginBottom: '16px' }}>
+                            <ShimmerTitle line={1} gap={0} variant="primary" />
+                          </div>
+
+                          {/* Description shimmer */}
+                          <div style={{ marginBottom: '16px' }}>
+                            <ShimmerText line={2} gap={8} />
+                          </div>
+
+                          {/* Meta rows shimmer */}
+                          <div className="collab-card-meta" style={{ marginTop: 'auto' }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <ShimmerThumbnail height={14} width={14} rounded />
+                              <div style={{ width: '100px' }}><ShimmerText line={1} gap={0} /></div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '8px' }}>
+                              <ShimmerThumbnail height={14} width={14} rounded />
+                              <div style={{ width: '150px' }}><ShimmerText line={1} gap={0} /></div>
+                            </div>
+                          </div>
+
+                          {/* Progress bar shimmer */}
+                          <div className="collab-progress" style={{ marginTop: '16px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                              <div style={{ width: '60px' }}><ShimmerText line={1} /></div>
+                              <div style={{ width: '40px' }}><ShimmerText line={1} /></div>
+                            </div>
+                            <ShimmerThumbnail height={8} rounded />
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+
+                {/* État d'erreur */}
+                {swrError && (
+                  <div className="collab-empty" style={{ color: '#EF4444' }}>
+                    <p>Erreur lors du chargement des collaborations.</p>
+                    <button
+                      onClick={() => mutate()}
+                      style={{ marginTop: '12px', padding: '8px 16px', cursor: 'pointer' }}
+                    >
+                      Réessayer
+                    </button>
+                  </div>
+                )}
+
+                {/* Liste */}
+                {!isLoading && !swrError && filtered.length === 0 ? (
+                  <div className="collab-empty">
+                    <p>Aucune collaboration ne correspond à vos critères.</p>
+                  </div>
+                ) : !isLoading && !swrError ? (
+                  <>
+                    <div className="collab-grid">
+                      {filtered.map((c) => (
+                        <article
+                          key={c.id}
+                          className="collab-card collab-card-clickable"
+                          onClick={() => openCollabDetail(c)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              openCollabDetail(c);
+                            }
+                          }}
+                        >
+                          <div
+                            className="collab-card-cover"
+                            style={{ backgroundImage: `url(${c.image})` }}
+                          >
+                            <span
+                              className={`collab-status-badge collab-status-${c.status}`}
+                            >
+                              {c.status === 'completed' ? (
+                                <>
+                                  <TickCircle
+                                    size={14}
+                                    variant="Bold"
+                                    color="#FFFFFF"
+                                  />
+                                  Terminée
+                                </>
+                              ) : (
+                                <>
+                                  <Clock size={14} variant="Bold" color="#FFFFFF" />
+                                  En cours
+                                </>
+                              )}
+                            </span>
+                          </div>
+
+                          <div className="collab-card-body">
+                            <div className="collab-card-org">{c.organisation}</div>
+                            <h3 className="collab-card-title">{c.title}</h3>
+                            {/* Badge de rôle */}
+                            {c.userRole && (
+                              <div className={`collab-role-badge collab-role-${c.userRole}`}>
+                                {c.userRole === 'leader' && <Crown1 size={12} variant="Bold" color="#F59E0B" />}
+                                {c.userRole === 'contributeur' && <People size={12} variant="Bold" color="#3AA2DD" />}
+                                {c.userRole === 'observateur' && <Eye size={12} variant="Bold" color="#6C7278" />}
+                                <span>Votre rôle : {c.userRole.charAt(0).toUpperCase() + c.userRole.slice(1)}</span>
+                              </div>
+                            )}
+                            <p className="collab-card-desc">{c.description}</p>
+
+                            <div className="collab-card-meta">
+                              <div className="collab-meta-row">
+                                <Location
+                                  size={14}
+                                  variant="Bold"
+                                  color="#6C7278"
+                                />
+                                <span>{c.location}</span>
+                              </div>
+                              <div className="collab-meta-row">
+                                <Calendar
+                                  size={14}
+                                  variant="Bold"
+                                  color="#6C7278"
+                                />
+                                <span>
+                                  {c.startDate} → {c.endDate}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="collab-progress">
+                              <div className="collab-progress-head">
+                                <span>Progression</span>
+                                <span className="collab-progress-value">
+                                  {getSavedProgress(c)}%
+                                </span>
+                              </div>
+                              <div className="collab-progress-bar">
+                                <div
+                                  className={`collab-progress-fill collab-progress-${isCollabClosed(c.id) ? 'completed' : c.status}`}
+                                  style={{ width: `${getSavedProgress(c)}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            {isCollabClosed(c.id) && (
+                              <div className="collab-closed-badge">
+                                <Lock1 size={14} variant="Bold" color="#FFFFFF" />
+                                Collaboration clôturée
+                              </div>
+                            )}
+
+
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </>
+                ) : null}
               </>
             ) : (
-              <CollaborationRequests
-                onLogout={onLogout}
-                user={user}
-                activeNav={activeNav}
-                onNavChange={onNavChange}
-                embedded={true}
-              />
+              <CollaborationRequests embedded={true} />
             )}
           </div>
         </main>
@@ -1090,7 +1175,7 @@ export const Collaboration = ({ onLogout, user, activeNav, onNavChange }) => {
                 <div className="tasks-add-form">
                   <div className="tasks-add-form-header">
                     <h4 className="tasks-add-form-title">
-                       Nouvelle tâche
+                      Nouvelle tâche
                     </h4>
                   </div>
 
@@ -1435,7 +1520,7 @@ export const Collaboration = ({ onLogout, user, activeNav, onNavChange }) => {
                 {/* Recherche */}
                 <div className="suggest-section">
                   <label className="suggest-section-label">
-                     Rechercher une organisation
+                    Rechercher une organisation
                   </label>
                   <div className="suggest-search-wrapper">
                     <div className="suggest-search">

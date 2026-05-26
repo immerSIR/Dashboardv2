@@ -1,23 +1,48 @@
 import { useState } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Sms, Eye, EyeSlash } from 'iconsax-react';
 import logoMapAction from '../../assets/logo.svg';
 import loginBg from '../../assets/login_bg.png';
+import { authService } from './services/authService';
 import './login.css';
 
 export const Login = ({ onLogin }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
-      onLogin && onLogin({ email, password, rememberMe });
+    setError('');
+
+    console.log('[LOGIN] Credentials envoyés:', { email, password: password });
+
+    try {
+      const result = await authService.login({ email, password });
+
+      if (result.success) {
+        // Appelle le callback onLogin si fourni
+        onLogin && onLogin(result.user);
+
+        // Redirige vers la page demandée ou le dashboard
+        const from = location.state?.from?.pathname || '/dashboard';
+        navigate(from, { replace: true });
+      }
+    } catch (err) {
+      setError(
+        typeof err === 'string'
+          ? err
+          : err?.detail || 'Erreur de connexion. Vérifiez vos identifiants.'
+      );
+    } finally {
       setIsLoading(false);
-    }, 500);
+    }
   };
 
   return (
@@ -35,6 +60,18 @@ export const Login = ({ onLogin }) => {
           </div>
 
           <form onSubmit={handleSubmit} className="login-form">
+            {error && (
+              <div className="login-error" style={{
+                backgroundColor: '#FEE2E2',
+                color: '#DC2626',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                marginBottom: '16px',
+                fontSize: '14px'
+              }}>
+                {error}
+              </div>
+            )}
             <div className="field">
               <label className="field-label">E-mail</label>
               <div className="field-input">
@@ -83,7 +120,7 @@ export const Login = ({ onLogin }) => {
                 />
                 <span>Se souvenir de moi</span>
               </label>
-              <a href="#" className="forgot-password">Mot de passe oublié ?</a>
+              <Link to="/forgot-password" className="forgot-password">Mot de passe oublié ?</Link>
             </div>
 
             <button type="submit" className="login-submit" disabled={isLoading}>

@@ -1,19 +1,18 @@
 import React, { useState, useMemo } from 'react';
+import useSWR from 'swr';
 import Map, { Marker } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { ShimmerThumbnail, ShimmerTitle, ShimmerText } from 'react-shimmer-effects';
+import { getIncidentService } from '../../../incident/service/incident_service';
 import {
   CloseCircle,
   Location,
   Calendar,
-  Category2,
-  People,
-  Danger,
-  TickCircle,
+ 
   VideoSquare,
   MagicStar,
   ClipboardTick
 } from 'iconsax-react';
-import { projects } from '../../../collaboration-project/data/projects';
 import './map.css';
 
 // Token Mapbox depuis les variables d'environnement
@@ -36,10 +35,10 @@ const SEVERITY_LABEL = {
 };
 
 const INCIDENT_STATUS_STEPS = [
-  { id: 'declared', label: 'Déclaré' },
-  { id: 'analysis', label: 'Analyse' },
-  { id: 'taken', label: 'Pris en compte' },
-  { id: 'resolved', label: 'Résolu' }
+  { id: 'declared', label: 'Déclaré',   },
+  { id: 'taken_into_account', label: 'Pris en compte',  },
+  { id: 'in_progress', label: 'En cours',   },
+  { id: 'resolved', label: 'Résolu'  }
 ];
 
 // Style "Humanitaire" inspiré d'OpenStreetMap HOT (Humanitarian OSM Team)
@@ -83,52 +82,72 @@ const MAP_STYLES = {
   }
 };
 
-export const MapContainer = () => {
-  const [selectedIncident, setSelectedIncident] = useState(null);
+export const MapContainer = ({ incidents = [], isLoading = false }) => {
+  const [selectedIncidentId, setSelectedIncidentId] = useState(null);
   const [modalClosing, setModalClosing] = useState(false);
   const [activeStyle, setActiveStyle] = useState('humanitarian');
 
-  // On filtre uniquement les projets avec des coordonnées
-  const incidents = useMemo(
-    () => projects.filter((p) => p.coordinates),
-    []
+  // Utiliser useSWR pour récupérer les détails de l'incident sélectionné
+  const { data: selectedIncident, isLoading: isLoadingIncident } = useSWR(
+    selectedIncidentId ? `/incident/${selectedIncidentId}` : null,
+    () => getIncidentService(selectedIncidentId),
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 300000, // 5 minutes
+      onError: (err) => {
+        console.error('[MAP] Erreur chargement incident:', err);
+      },
+      onSuccess: (data) => {
+        console.log('[MAP] Incident chargé:', data);
+      }
+    }
+  );
+
+  // Filtre uniquement les incidents avec lattitude et longitude valides
+  const validIncidents = useMemo(
+    () => incidents.filter((inc) => {
+      const lat = parseFloat(inc.lattitude);
+      const lng = parseFloat(inc.longitude);
+      return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+    }),
+    [incidents]
   );
 
   const openModal = (incident) => {
     setModalClosing(false);
-    setSelectedIncident(incident);
+    setSelectedIncidentId(incident.id);
   };
 
   const closeModal = () => {
     setModalClosing(true);
     setTimeout(() => {
-      setSelectedIncident(null);
+      setSelectedIncidentId(null);
       setModalClosing(false);
     }, 250);
   };
 
   // Centre de la carte basé sur la moyenne des coordonnées
   const center = useMemo(() => {
-    if (incidents.length === 0) return { lng: -8.0, lat: 12.65 };
-    const avg = incidents.reduce(
+    if (validIncidents.length === 0) return { lng: -8.0, lat: 12.65 };
+    const avg = validIncidents.reduce(
       (acc, inc) => ({
-        lng: acc.lng + inc.coordinates.lng,
-        lat: acc.lat + inc.coordinates.lat
+        lng: acc.lng + parseFloat(inc.longitude),
+        lat: acc.lat + parseFloat(inc.lattitude)
       }),
       { lng: 0, lat: 0 }
     );
     return {
-      lng: avg.lng / incidents.length,
-      lat: avg.lat / incidents.length
+      lng: avg.lng / validIncidents.length,
+      lat: avg.lat / validIncidents.length
     };
-  }, [incidents]);
+  }, [validIncidents]);
 
   // Index de l'étape de statut courante
   const statusIndex = selectedIncident
     ? Math.max(
         0,
         INCIDENT_STATUS_STEPS.findIndex(
-          (s) => s.id === (selectedIncident.incidentStatus || 'analysis')
+          (s) => s.id === (selectedIncident.etat || 'declared')
         )
       )
     : 0;
@@ -136,6 +155,16 @@ export const MapContainer = () => {
   return (
     <div className="card">
       <div className="map-container">
+        {/* Loader overlay */}
+        {isLoading && (
+          <div className="map-loading-overlay">
+            <div className="map-loading-spinner">
+              <div className="spinner"></div>
+              <p>Chargement des incidents...</p>
+            </div>
+          </div>
+        )}
+
         <Map
           initialViewState={{
             longitude: center.lng,
@@ -150,13 +179,13 @@ export const MapContainer = () => {
           touchPitch={true}
         >
           {/* Markers d'incidents */}
-          {incidents.map((incident) => {
-            const severity = getSeverity(incident);
+          {!isLoading && validIncidents.map((incident) => {
+            const severity = incident.etat === 'declared' ? 'critical' : 'medium';
             return (
               <Marker
                 key={incident.id}
-                longitude={incident.coordinates.lng}
-                latitude={incident.coordinates.lat}
+                longitude={parseFloat(incident.longitude)}
+                latitude={parseFloat(incident.lattitude)}
                 anchor="center"
               >
                 <button
@@ -179,8 +208,8 @@ export const MapContainer = () => {
 
         {/* Bandeau titre */}
         <div className="map-title-overlay">
-          <span className="map-title-overlay-label">ALERTE · INCIDENTS ACTIFS</span>
-          <span className="map-title-overlay-count">{incidents.length}</span>
+          <span className="map-title-overlay-label">INCIDENTS ACTIFS</span>
+          <span className="map-title-overlay-count">{validIncidents.length}</span>
         </div>
 
         {/* Switcher de style de carte */}
@@ -204,28 +233,28 @@ export const MapContainer = () => {
             <div className="map-legend-item">
               <span
                 className="map-legend-dot"
-                style={{ backgroundColor: '#EF4444' }}
+                style={{ backgroundColor: 'var(--color-severity-high)' }}
               />
               Critique
             </div>
             <div className="map-legend-item">
               <span
                 className="map-legend-dot"
-                style={{ backgroundColor: '#F59E0B' }}
+                style={{ backgroundColor: 'var(--color-severity-medium)' }}
               />
               Élevée
             </div>
             <div className="map-legend-item">
               <span
                 className="map-legend-dot"
-                style={{ backgroundColor: '#3AA2DD' }}
+                style={{ backgroundColor: 'var(--color-primary)' }}
               />
               Moyenne
             </div>
             <div className="map-legend-item">
               <span
                 className="map-legend-dot"
-                style={{ backgroundColor: '#22C55E' }}
+                style={{ backgroundColor: 'var(--color-severity-low)' }}
               />
               Faible
             </div>
@@ -234,7 +263,7 @@ export const MapContainer = () => {
       </div>
 
       {/* Modal d'incident (pattern tasks-modal, slide depuis la droite) */}
-      {selectedIncident && (
+      {selectedIncidentId && (
         <div
           className={`incident-modal-overlay ${modalClosing ? 'closing' : ''}`}
           onClick={closeModal}
@@ -248,11 +277,21 @@ export const MapContainer = () => {
             <header className="incident-modal-header">
               <div className="incident-modal-header-main">
                 <h3 className="incident-modal-title">
-                  {selectedIncident.title}
+                  {isLoadingIncident ? (
+                    <ShimmerTitle line={1} gap={10} variant="primary" />
+                  ) : (
+                    selectedIncident?.title || 'Chargement...'
+                  )}
                 </h3>
                 <p className="incident-modal-subtitle">
-                  <Location size={14} variant="Bold" color="#6C7278" />
-                  {selectedIncident.location} • {selectedIncident.type}
+                  {isLoadingIncident ? (
+                    <ShimmerText line={1} gap={10} />
+                  ) : (
+                    <>
+                      <Location size={14} variant="Bold" color="var(--color-text-secondary)" />
+                      {selectedIncident?.zone} • {selectedIncident?.etat}
+                    </>
+                  )}
                 </p>
               </div>
               <button
@@ -267,60 +306,85 @@ export const MapContainer = () => {
 
             {/* Body scrollable */}
             <div className="incident-modal-body">
-              {/* Cover image */}
-              <div
-                className="incident-modal-cover"
-                style={{ backgroundImage: `url(${selectedIncident.image})` }}
-              />
+              {isLoadingIncident || !selectedIncident ? (
+                /* Shimmer Loader */
+                <div className="incident-modal-shimmer">
+                  {/* Cover shimmer */}
+                  <ShimmerThumbnail height={240} rounded />
+                  
+                  {/* Badges shimmer */}
+                  <div style={{ display: 'flex', gap: 'var(--spacing-2)', marginTop: 'var(--spacing-4)', marginBottom: 'var(--spacing-6)' }}>
+                    <ShimmerTitle line={1} gap={10} variant="secondary" />
+                  </div>
+                  
+                  {/* Meta rows shimmer */}
+                  <div style={{ marginBottom: 'var(--spacing-6)' }}>
+                    <ShimmerText line={3} gap={10} />
+                  </div>
+                  
+                  {/* Status bar shimmer */}
+                  <div style={{ marginBottom: 'var(--spacing-4)' }}>
+                    <ShimmerThumbnail height={120} rounded />
+                  </div>
+                  
+                  {/* Content shimmer */}
+                  <ShimmerText line={5} gap={10} />
+                </div>
+              ) : (
+                <>
+                  {/* Cover image */}
+                  {selectedIncident.photo && (
+                    <div
+                      className="incident-modal-cover"
+                      style={{ backgroundImage: `url(${selectedIncident.photo})` }}
+                    />
+                  )}
 
-              {/* Badges */}
-              <div className="incident-modal-badges">
-                {(selectedIncident.badges || []).map((badge, idx) => (
-                  <span
-                    key={idx}
-                    className={`incident-modal-badge variant-${badge.variant}`}
-                  >
-                    {badge.label}
-                  </span>
-                ))}
+                  {/* Badges */}
+                  <div className="incident-modal-badges">
                 <span
                   className={`incident-modal-badge variant-${
-                    getSeverity(selectedIncident) === 'critical'
-                      ? 'critical'
-                      : 'in-progress'
+                    selectedIncident.etat === 'declared' ? 'critical' : 'in-progress'
                   }`}
                 >
-                  SÉVÉRITÉ : {SEVERITY_LABEL[getSeverity(selectedIncident)].toUpperCase()}
+                  STATUT : {selectedIncident.etat?.toUpperCase() || 'DÉCLARÉ'}
                 </span>
+                {selectedIncident.zone && (
+                  <span className="incident-modal-badge variant-info">
+                    {selectedIncident.zone}
+                  </span>
+                )}
               </div>
+
+              {/* Description */}
+              {selectedIncident.description && (
+                <div className="incident-modal-meta">
+                  <p style={{ margin: '0 0 var(--spacing-4) 0', color: 'var(--color-text-secondary)' }}>
+                    {selectedIncident.description}
+                  </p>
+                </div>
+              )}
 
               {/* Méta-données */}
               <div className="incident-modal-meta">
                 <div className="incident-modal-meta-row">
-                  <Category2 size={16} variant="Bold" color="#3AA2DD" />
+                  <Calendar size={16} variant="Bold" color="var(--color-primary)" />
                   <span>
-                    <strong>Type :</strong> {selectedIncident.type}
+                    <strong>Créé le :</strong>{' '}
+                    {new Date(selectedIncident.created_at).toLocaleDateString('fr-FR', {
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
                   </span>
                 </div>
                 <div className="incident-modal-meta-row">
-                  <Calendar size={16} variant="Bold" color="#3AA2DD" />
+                  <Location size={16} variant="Bold" color="var(--color-primary)" />
                   <span>
-                    <strong>Période :</strong> {selectedIncident.startDate} → {selectedIncident.endDate}
-                  </span>
-                </div>
-                {selectedIncident.participantsCount && (
-                  <div className="incident-modal-meta-row">
-                    <People size={16} variant="Bold" color="#3AA2DD" />
-                    <span>
-                      <strong>Participants :</strong> {selectedIncident.participantsCount}
-                    </span>
-                  </div>
-                )}
-                <div className="incident-modal-meta-row">
-                  <Location size={16} variant="Bold" color="#3AA2DD" />
-                  <span>
-                    {selectedIncident.coordinates.lat.toFixed(4)}°N,{' '}
-                    {selectedIncident.coordinates.lng.toFixed(4)}°E
+                    {parseFloat(selectedIncident.lattitude).toFixed(4)}°N,{' '}
+                    {parseFloat(selectedIncident.longitude).toFixed(4)}°E
                   </span>
                 </div>
               </div>
@@ -328,8 +392,7 @@ export const MapContainer = () => {
               {/* Statut de l'incident */}
               <div className="incident-modal-section">
                 <h4 className="incident-modal-section-label">
-                  <ClipboardTick size={14} variant="Bold" color="#3AA2DD" />
-                  STATUT DE L'INCIDENT
+                   STATUT DE L'INCIDENT
                 </h4>
                 <div>
                   <div className="incident-modal-status-bar">
@@ -358,39 +421,17 @@ export const MapContainer = () => {
                 </div>
               </div>
 
-              {/* Analyse IA */}
-              {selectedIncident.aiAnalysis?.text && (
+              {/* Médias */}
+              {selectedIncident.audio && (
                 <div className="incident-modal-section">
                   <h4 className="incident-modal-section-label">
-                    <MagicStar size={14} variant="Bold" color="#3AA2DD" />
-                    ANALYSE IA DE L'INCIDENT
+                    <MagicStar size={14} variant="Bold" color="var(--color-primary)" />
+                    AUDIO
                   </h4>
-                  <p className="incident-modal-ai">
-                    {selectedIncident.aiAnalysis.text}
-                  </p>
-                </div>
-              )}
-
-              {/* Description complète */}
-              <div className="incident-modal-section">
-                <h4 className="incident-modal-section-label">DESCRIPTION</h4>
-                <p className="incident-modal-description">
-                  {selectedIncident.fullDescription || selectedIncident.description}
-                </p>
-              </div>
-
-              {/* Objectifs */}
-              {selectedIncident.objectives?.length > 0 && (
-                <div className="incident-modal-section">
-                  <h4 className="incident-modal-section-label">OBJECTIFS CLÉS</h4>
-                  <div className="incident-modal-objectives">
-                    {selectedIncident.objectives.map((obj, idx) => (
-                      <div key={idx} className="incident-modal-objective">
-                        <TickCircle size={16} variant="Bold" color="#22C55E" />
-                        <span>{obj}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <audio controls style={{ width: '100%' }}>
+                    <source src={selectedIncident.audio} type="audio/mpeg" />
+                    Votre navigateur ne supporte pas l'élément audio.
+                  </audio>
                 </div>
               )}
 
@@ -398,7 +439,7 @@ export const MapContainer = () => {
               {selectedIncident.video && (
                 <div className="incident-modal-section">
                   <h4 className="incident-modal-section-label">
-                    <VideoSquare size={14} variant="Bold" color="#3AA2DD" />
+                    <VideoSquare size={14} variant="Bold" color="var(--color-primary)" />
                     VIDÉO DE PRÉSENTATION
                   </h4>
                   <div className="incident-modal-video">
@@ -447,6 +488,8 @@ export const MapContainer = () => {
                     )}
                   </div>
                 </div>
+              )}
+                </>
               )}
             </div>
           </aside>

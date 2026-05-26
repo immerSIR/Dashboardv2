@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useSidebarState } from '../../hooks/useSidebarState';
 import {
   People,
   Box1,
@@ -47,9 +48,13 @@ const CATEGORY_ICONS = {
   health: Heart
 };
 
-export const Impact = ({ onLogout, user, activeNav, onNavChange }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+export const Impact = () => {
+  const {
+    isOpen: sidebarOpen,
+    setOpen: setSidebarOpen,
+    isCollapsed: sidebarCollapsed,
+    setCollapsed: setSidebarCollapsed,
+  } = useSidebarState();
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -111,8 +116,7 @@ export const Impact = ({ onLogout, user, activeNav, onNavChange }) => {
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        activeItem={activeNav}
-        onItemClick={onNavChange}
+        isCollapsed={sidebarCollapsed}
         onCollapsedChange={setSidebarCollapsed}
       />
 
@@ -121,10 +125,7 @@ export const Impact = ({ onLogout, user, activeNav, onNavChange }) => {
       >
         <Header
           onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
-          user={user}
           sidebarCollapsed={sidebarCollapsed}
-          onLogout={onLogout}
-          onNavChange={onNavChange}
         />
 
         <main className="impact-content">

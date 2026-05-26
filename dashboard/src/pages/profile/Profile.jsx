@@ -1,4 +1,5 @@
-import React, { useRef, useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { useSidebarState } from '../../hooks/useSidebarState';
 import {
   User,
   Sms,
@@ -19,46 +20,51 @@ import {
   ArrowRight2
 } from 'iconsax-react';
 import { Header, Sidebar } from '../../components/layout';
+import { authService } from '../auth/services/authService';
 import './profile.css';
 
 const TABS = [
   { id: 'personal', label: 'Informations personnelles', icon: User },
   { id: 'organisation', label: 'Organisation', icon: Buildings2 },
-  { id: 'security', label: 'Sécurité', icon: Lock1 },
-  { id: 'preferences', label: 'Préférences', icon: Setting2 }
+  { id: 'security', label: 'Sécurité', icon: Lock1 }
 ];
 
-const initialProfile = {
-  firstName: 'Aïssata',
-  lastName: 'Diallo',
-  email: 'aissata.diallo@mapaction.org',
-  phone: '+223 76 12 34 56',
-  address: 'Hamdallaye ACI 2000, Rue 392',
-  city: 'Bamako',
-  country: 'Mali',
-  birthDate: '1992-06-14',
-  bio:
-    "Coordinatrice terrain passionnée par l'humanitaire et l'environnement. 8 ans d'expérience en zone rurale au Mali.",
-  avatar: null,
-  organisation: 'Map Action Mali',
-  role: 'Coordinatrice projets',
-  department: 'Opérations terrain',
-  joinedAt: '2021-09-12',
-  language: 'Français',
-  notifications: {
-    email: true,
-    push: true,
-    sms: false,
-    weekly: true
+const getInitialProfile = () => {
+  try {
+    const userStr = sessionStorage.getItem('user');
+    if (userStr) {
+      return JSON.parse(userStr);
+    }
+  } catch (error) {
+    console.error('Erreur lors de la lecture du profil dans sessionStorage:', error);
   }
+
+  // Fallback par défaut si aucune donnée utilisateur n'est trouvée
+  return {
+    id: null,
+    organisation_name: "",
+    email: "",
+    first_name: "",
+    last_name: "",
+    phone: "",
+    date_joined: "",
+    avatar: null,
+    address: "",
+    user_type: "",
+    org_role: ""
+  };
 };
 
-export const Profile = ({ onLogout, user, activeNav, onNavChange }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+export const Profile = () => {
+  const {
+    isOpen: sidebarOpen,
+    setOpen: setSidebarOpen,
+    isCollapsed: sidebarCollapsed,
+    setCollapsed: setSidebarCollapsed,
+  } = useSidebarState();
 
-  const [profile, setProfile] = useState(initialProfile);
-  const [draft, setDraft] = useState(initialProfile);
+  const [profile, setProfile] = useState(getInitialProfile);
+  const [draft, setDraft] = useState(getInitialProfile);
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('personal');
   const [savedFlash, setSavedFlash] = useState(false);
@@ -76,11 +82,7 @@ export const Profile = ({ onLogout, user, activeNav, onNavChange }) => {
   const handleField = (key, value) =>
     setDraft((d) => ({ ...d, [key]: value }));
 
-  const handleNotifToggle = (key) =>
-    setDraft((d) => ({
-      ...d,
-      notifications: { ...d.notifications, [key]: !d.notifications[key] }
-    }));
+
 
   const handleAvatarChange = (e) => {
     const file = e.target.files?.[0];
@@ -105,7 +107,9 @@ export const Profile = ({ onLogout, user, activeNav, onNavChange }) => {
     setIsEditing(false);
   };
 
-  const handleChangePassword = (e) => {
+  const [isChangingPwd, setIsChangingPwd] = useState(false);
+
+  const handleChangePassword = async (e) => {
     e.preventDefault();
     if (pwd.next.length < 8) {
       setPwdMessage({
@@ -121,17 +125,34 @@ export const Profile = ({ onLogout, user, activeNav, onNavChange }) => {
       });
       return;
     }
-    setPwdMessage({
-      type: 'success',
-      text: 'Mot de passe mis à jour avec succès.'
-    });
-    setPwd({ current: '', next: '', confirm: '' });
-    setTimeout(() => setPwdMessage(null), 3000);
+
+    setIsChangingPwd(true);
+    setPwdMessage(null);
+
+    try {
+      await authService.changePassword({
+        old_password: pwd.current,
+        new_password: pwd.next
+      });
+
+      setPwdMessage({
+        type: 'success',
+        text: 'Mot de passe mis à jour avec succès.'
+      });
+      setPwd({ current: '', next: '', confirm: '' });
+    } catch (error) {
+      setPwdMessage({
+        type: 'error',
+        text: error.response?.data?.error || 'Erreur lors de la modification du mot de passe.'
+      });
+    } finally {
+      setIsChangingPwd(false);
+      setTimeout(() => setPwdMessage(null), 3000);
+    }
   };
 
-  const initials = `${profile.firstName?.[0] ?? ''}${
-    profile.lastName?.[0] ?? ''
-  }`.toUpperCase();
+  const initials = `${profile.first_name?.[0] ?? ''}${profile.last_name?.[0] ?? ''
+    }`.toUpperCase();
 
   const formatDate = (iso) => {
     if (!iso) return '—';
@@ -147,22 +168,17 @@ export const Profile = ({ onLogout, user, activeNav, onNavChange }) => {
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        activeItem={activeNav}
-        onItemClick={onNavChange}
+        isCollapsed={sidebarCollapsed}
         onCollapsedChange={setSidebarCollapsed}
       />
 
       <div
-        className={`profile-main ${
-          sidebarCollapsed ? 'sidebar-collapsed' : ''
-        }`}
+        className={`profile-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''
+          }`}
       >
         <Header
           onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
-          user={user}
           sidebarCollapsed={sidebarCollapsed}
-          onLogout={onLogout}
-          onNavChange={onNavChange}
         />
 
         <main className="profile-content">
@@ -215,10 +231,10 @@ export const Profile = ({ onLogout, user, activeNav, onNavChange }) => {
 
                 <div className="profile-banner-info">
                   <h2 className="profile-banner-name">
-                    {profile.firstName} {profile.lastName}
+                    {profile.first_name} {profile.last_name}
                   </h2>
                   <p className="profile-banner-role">
-                    {profile.role} · {profile.organisation}
+                    {profile.org_role} · {profile.organisation_name}
                   </p>
                   <div className="profile-banner-meta">
                     <span>
@@ -227,11 +243,11 @@ export const Profile = ({ onLogout, user, activeNav, onNavChange }) => {
                     </span>
                     <span>
                       <Location size={14} variant="Bold" color="#6C7278" />
-                      {profile.city}, {profile.country}
+                      {profile.address || '—'}
                     </span>
                     <span>
                       <Calendar size={14} variant="Bold" color="#6C7278" />
-                      Membre depuis {formatDate(profile.joinedAt)}
+                      Membre depuis {formatDate(profile.date_joined)}
                     </span>
                   </div>
                 </div>
@@ -280,9 +296,8 @@ export const Profile = ({ onLogout, user, activeNav, onNavChange }) => {
                     <button
                       key={t.id}
                       type="button"
-                      className={`profile-tab ${
-                        activeTab === t.id ? 'is-active' : ''
-                      }`}
+                      className={`profile-tab ${activeTab === t.id ? 'is-active' : ''
+                        }`}
                       onClick={() => setActiveTab(t.id)}
                     >
                       <Icon size={18} variant="Bold" color="currentColor" />
@@ -319,10 +334,10 @@ export const Profile = ({ onLogout, user, activeNav, onNavChange }) => {
                         <input
                           id="firstName"
                           type="text"
-                          value={draft.firstName}
+                          value={draft.first_name || ''}
                           disabled={!isEditing}
                           onChange={(e) =>
-                            handleField('firstName', e.target.value)
+                            handleField('first_name', e.target.value)
                           }
                         />
                       </div>
@@ -331,104 +346,40 @@ export const Profile = ({ onLogout, user, activeNav, onNavChange }) => {
                         <input
                           id="lastName"
                           type="text"
-                          value={draft.lastName}
+                          value={draft.last_name || ''}
                           disabled={!isEditing}
                           onChange={(e) =>
-                            handleField('lastName', e.target.value)
+                            handleField('last_name', e.target.value)
                           }
                         />
                       </div>
                       <div className="profile-field">
                         <label htmlFor="email">
-                          <Sms size={14} variant="Bold" color="#6C7278" />
                           Email
                         </label>
                         <input
                           id="email"
                           type="email"
-                          value={draft.email}
+                          value={draft.email || ''}
                           disabled={!isEditing}
                           onChange={(e) =>
                             handleField('email', e.target.value)
                           }
                         />
                       </div>
-                      <div className="profile-field">
-                        <label htmlFor="phone">
-                          <Call size={14} variant="Bold" color="#6C7278" />
-                          Téléphone
-                        </label>
-                        <input
-                          id="phone"
-                          type="tel"
-                          value={draft.phone}
-                          disabled={!isEditing}
-                          onChange={(e) =>
-                            handleField('phone', e.target.value)
-                          }
-                        />
-                      </div>
+
                       <div className="profile-field profile-field-full">
                         <label htmlFor="address">
-                          <Location size={14} variant="Bold" color="#6C7278" />
                           Adresse
                         </label>
                         <input
                           id="address"
                           type="text"
-                          value={draft.address}
+                          value={draft.address || ''}
                           disabled={!isEditing}
                           onChange={(e) =>
                             handleField('address', e.target.value)
                           }
-                        />
-                      </div>
-                      <div className="profile-field">
-                        <label htmlFor="city">Ville</label>
-                        <input
-                          id="city"
-                          type="text"
-                          value={draft.city}
-                          disabled={!isEditing}
-                          onChange={(e) => handleField('city', e.target.value)}
-                        />
-                      </div>
-                      <div className="profile-field">
-                        <label htmlFor="country">Pays</label>
-                        <input
-                          id="country"
-                          type="text"
-                          value={draft.country}
-                          disabled={!isEditing}
-                          onChange={(e) =>
-                            handleField('country', e.target.value)
-                          }
-                        />
-                      </div>
-                      <div className="profile-field">
-                        <label htmlFor="birthDate">
-                          <Calendar size={14} variant="Bold" color="#6C7278" />
-                          Date de naissance
-                        </label>
-                        <input
-                          id="birthDate"
-                          type="date"
-                          value={draft.birthDate}
-                          disabled={!isEditing}
-                          onChange={(e) =>
-                            handleField('birthDate', e.target.value)
-                          }
-                        />
-                      </div>
-                      <div className="profile-field profile-field-full">
-                        <label htmlFor="bio">À propos de moi</label>
-                        <textarea
-                          id="bio"
-                          rows={4}
-                          value={draft.bio}
-                          disabled={!isEditing}
-                          onChange={(e) => handleField('bio', e.target.value)}
-                          placeholder="Présentez-vous en quelques lignes…"
                         />
                       </div>
                     </div>
@@ -442,62 +393,27 @@ export const Profile = ({ onLogout, user, activeNav, onNavChange }) => {
                     <div className="profile-grid">
                       <div className="profile-field profile-field-full">
                         <label htmlFor="organisation">
-                          <Buildings2
-                            size={14}
-                            variant="Bold"
-                            color="#6C7278"
-                          />
+
                           Organisation
                         </label>
                         <input
                           id="organisation"
                           type="text"
-                          value={draft.organisation}
+                          value={draft.organisation_name || ''}
                           disabled={!isEditing}
                           onChange={(e) =>
-                            handleField('organisation', e.target.value)
+                            handleField('organisation_name', e.target.value)
                           }
                         />
                       </div>
-                      <div className="profile-field">
-                        <label htmlFor="role">
-                          <Briefcase
-                            size={14}
-                            variant="Bold"
-                            color="#6C7278"
-                          />
-                          Poste
-                        </label>
-                        <input
-                          id="role"
-                          type="text"
-                          value={draft.role}
-                          disabled={!isEditing}
-                          onChange={(e) => handleField('role', e.target.value)}
-                        />
-                      </div>
-                      <div className="profile-field">
-                        <label htmlFor="department">Département</label>
-                        <input
-                          id="department"
-                          type="text"
-                          value={draft.department}
-                          disabled={!isEditing}
-                          onChange={(e) =>
-                            handleField('department', e.target.value)
-                          }
-                        />
-                      </div>
+
                       <div className="profile-field">
                         <label htmlFor="joinedAt">Date d'arrivée</label>
                         <input
                           id="joinedAt"
-                          type="date"
-                          value={draft.joinedAt}
-                          disabled={!isEditing}
-                          onChange={(e) =>
-                            handleField('joinedAt', e.target.value)
-                          }
+                          type="text"
+                          value={formatDate(draft.date_joined) || ''}
+                          disabled
                         />
                       </div>
                     </div>
@@ -520,11 +436,10 @@ export const Profile = ({ onLogout, user, activeNav, onNavChange }) => {
 
                     {pwdMessage && (
                       <div
-                        className={`profile-alert ${
-                          pwdMessage.type === 'success'
-                            ? 'is-success'
-                            : 'is-error'
-                        }`}
+                        className={`profile-alert ${pwdMessage.type === 'success'
+                          ? 'is-success'
+                          : 'is-error'
+                          }`}
                       >
                         {pwdMessage.type === 'success' ? (
                           <TickCircle
@@ -604,91 +519,16 @@ export const Profile = ({ onLogout, user, activeNav, onNavChange }) => {
                       <button
                         type="submit"
                         className="profile-btn profile-btn-primary"
+                        disabled={isChangingPwd}
                       >
                         <Lock1 size={16} variant="Bold" color="#FFFFFF" />
-                        Mettre à jour le mot de passe
+                        {isChangingPwd ? 'Mise à jour...' : 'Mettre à jour le mot de passe'}
                       </button>
                     </div>
                   </form>
                 )}
 
-                {/* PREFERENCES */}
-                {activeTab === 'preferences' && (
-                  <div className="profile-form">
-                    <h3 className="profile-section-title">Préférences</h3>
 
-                    <div className="profile-field profile-field-full">
-                      <label htmlFor="lang">
-                        <Global size={14} variant="Bold" color="#6C7278" />
-                        Langue de l'interface
-                      </label>
-                      <select
-                        id="lang"
-                        value={draft.language}
-                        disabled={!isEditing}
-                        onChange={(e) =>
-                          handleField('language', e.target.value)
-                        }
-                      >
-                        <option value="Français">Français</option>
-                        <option value="Bambara">Bambara</option>
-                        <option value="Fulfulde">Fulfulde</option>
-                        <option value="English">English</option>
-                      </select>
-                    </div>
-
-                    <h4 className="profile-subsection-title">
-                      Notifications
-                    </h4>
-                    <div className="profile-toggle-list">
-                      {[
-                        {
-                          key: 'email',
-                          label: 'Notifications par email',
-                          hint: 'Recevoir les alertes importantes par email.'
-                        },
-                        {
-                          key: 'push',
-                          label: 'Notifications push',
-                          hint: 'Recevoir des notifications dans le navigateur.'
-                        },
-                        {
-                          key: 'sms',
-                          label: 'Notifications SMS',
-                          hint: 'Recevoir les alertes critiques par SMS.'
-                        },
-                        {
-                          key: 'weekly',
-                          label: 'Récapitulatif hebdomadaire',
-                          hint: 'Un résumé chaque lundi matin.'
-                        }
-                      ].map((n) => (
-                        <div key={n.key} className="profile-toggle-row">
-                          <div>
-                            <div className="profile-toggle-label">
-                              {n.label}
-                            </div>
-                            <div className="profile-toggle-hint">{n.hint}</div>
-                          </div>
-                          <button
-                            type="button"
-                            className={`profile-toggle ${
-                              draft.notifications[n.key] ? 'is-on' : ''
-                            }`}
-                            onClick={() =>
-                              isEditing && handleNotifToggle(n.key)
-                            }
-                            disabled={!isEditing}
-                            role="switch"
-                            aria-checked={draft.notifications[n.key]}
-                          >
-                            <span className="profile-toggle-thumb" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </section>
             </div>
           </div>

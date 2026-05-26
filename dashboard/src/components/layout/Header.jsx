@@ -1,79 +1,78 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User, Setting2, LogoutCurve, ArrowDown2, Notification, Danger, People, InfoCircle } from 'iconsax-react';
 import logoMapActionMin from '../../assets/logo-min.svg';
+import { authService } from '../../pages/auth/services/authService';
+import { getNotifications, markNotificationAsRead } from './service/notification_service';
 import './header.css';
 
-export const Header = ({ onMenuToggle, user, onLogout, onNavChange }) => {
+export const Header = ({ onMenuToggle, user }) => {
+  const navigate = useNavigate();
+  const currentUser = user || authService.getCurrentUser();
   const [activeLanguage, setActiveLanguage] = useState('Français');
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
 
   const languages = ['Bambara', 'Fulfulde', 'Français'];
   
-  // Données de notifications (exemple)
-  const notifications = [
-    {
-      id: 2,
-      type: 'collaboration',
-      title: 'Nouvelle demande de collaboration',
-      message: 'L\'équipe B demande votre assistance',
-      time: 'Il y a 1h',
-      unread: true
-    },
-    {
-      id: 4,
-      type: 'system',
-      title: 'Mise à jour système',
-      message: 'Le système a été mis à jour avec succès',
-      time: 'Il y a 3h',
-      unread: false
-    },
-    {
-      id: 5,
-      type: 'collaboration',
-      title: 'Rapport partagé',
-      message: 'L\'équipe A a partagé un nouveau rapport',
-      time: 'Il y a 4h',
-      unread: false
-    },
-    {
-      id: 7,
-      type: 'system',
-      title: 'Sauvegarde effectuée',
-      message: 'La sauvegarde automatique a été effectuée',
-      time: 'Il y a 6h',
-      unread: false
-    },
-    {
-      id: 8,
-      type: 'collaboration',
-      title: 'Nouvelle mission assignée',
-      message: 'Vous avez été assigné à une nouvelle mission',
-      time: 'Il y a 8h',
-      unread: false
-    },
-    {
-      id: 10,
-      type: 'system',
-      title: 'Maintenance programmée',
-      message: 'Une maintenance est programmée pour demain',
-      time: 'Il y a 12h',
-      unread: false
-    }
-  ];
+  // Charger les notifications
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        setIsLoadingNotifications(true);
+        const data = await getNotifications();
+        console.log('[HEADER] Notifications chargées:', data);
+        setNotifications(data);
+      } catch (error) {
+        console.error('[HEADER] Erreur chargement notifications:', error);
+      } finally {
+        setIsLoadingNotifications(false);
+      }
+    };
+
+    fetchNotifications();
+    
+    // Rafraîchir toutes les 30 secondes
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, []);
   
-  const unreadCount = notifications.filter(n => n.unread).length;
-  
-  // Fonction pour obtenir l'icône selon le type
-  const getNotificationIcon = (type) => {
-    switch(type) {
-      case 'collaboration':
-        return <People size={20} variant="Bold" color="#3AA2DD" />;
-      case 'system':
-        return <InfoCircle size={20} variant="Bold" color="#6C7278" />;
-      default:
-        return <Notification size={20} variant="Bold" color="#6C7278" />;
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  // Formater le temps relatif
+  const getRelativeTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'À l\'instant';
+    if (diffMins < 60) return `Il y a ${diffMins}min`;
+    if (diffHours < 24) return `Il y a ${diffHours}h`;
+    return `Il y a ${diffDays}j`;
+  };
+
+  // Marquer une notification comme lue
+  const handleNotificationClick = async (notification) => {
+    if (!notification.read) {
+      try {
+        await markNotificationAsRead(notification.id);
+        setNotifications(prev => 
+          prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
+        );
+      } catch (error) {
+        console.error('[HEADER] Erreur marquage notification:', error);
+      }
     }
+  };
+  
+  // Fonction pour obtenir l'icône (toutes les notifs sont de type collaboration)
+  const getNotificationIcon = () => {
+    return <People size={20} variant="Bold" color="#3AA2DD" />;
   };
 
   return (
@@ -117,22 +116,34 @@ export const Header = ({ onMenuToggle, user, onLogout, onNavChange }) => {
               <div className="notification-menu-divider"></div>
               
               <div className="notification-list">
-                {notifications.map((notification) => (
-                  <div 
-                    key={notification.id} 
-                    className={`notification-item ${notification.unread ? 'unread' : ''}`}
-                  >
-                    <div className="notification-icon">
-                      {getNotificationIcon(notification.type)}
-                    </div>
-                    <div className="notification-content">
-                      <div className="notification-title">{notification.title}</div>
-                      <div className="notification-message">{notification.message}</div>
-                      <div className="notification-time">{notification.time}</div>
-                    </div>
-                    {notification.unread && <div className="notification-dot"></div>}
+                {isLoadingNotifications ? (
+                  <div style={{ padding: '20px', textAlign: 'center', color: '#6C7278' }}>
+                    Chargement...
                   </div>
-                ))}
+                ) : notifications.length === 0 ? (
+                  <div style={{ padding: '20px', textAlign: 'center', color: '#6C7278' }}>
+                    Aucune notification
+                  </div>
+                ) : (
+                  notifications.map((notification) => (
+                    <div 
+                      key={notification.id} 
+                      className={`notification-item ${!notification.read ? 'unread' : ''}`}
+                      onClick={() => handleNotificationClick(notification)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div className="notification-icon">
+                        {getNotificationIcon()}
+                      </div>
+                      <div className="notification-content">
+                        <div className="notification-title">Demande de collaboration</div>
+                        <div className="notification-message">{notification.message}</div>
+                        <div className="notification-time">{getRelativeTime(notification.created_at)}</div>
+                      </div>
+                      {!notification.read && <div className="notification-dot"></div>}
+                    </div>
+                  ))
+                )}
               </div>
               
               <div className="notification-menu-divider"></div>
@@ -144,32 +155,27 @@ export const Header = ({ onMenuToggle, user, onLogout, onNavChange }) => {
           )}
         </div>
 
-        {user && (
+        {currentUser && (
           <div className="profile-dropdown">
-            <div 
-              className="user-avatar"
+            <button
+              className="header-profile"
               onClick={() => setShowProfileMenu(!showProfileMenu)}
-              role="button"
               aria-label="Menu profil"
             >
-              <img 
-                src={user.avatar || '/default-avatar.png'} 
-                alt={user.name || 'User'}
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
-                }}
-              />
-              <div className="avatar-placeholder">
-                {(user.email || 'U').charAt(0).toUpperCase()}
+              <div style={{color:"white",fontWeight: "bold"}}>
+                {currentUser?.first_name.charAt(0).toUpperCase()}
               </div>
-            </div>
+              
+              <div className="header-profile-fallback" >
+                <User size={18} variant="Bold" style={{fill:"white"}} />
+              </div>
+            </button>
 
             {showProfileMenu && (
               <div className="profile-menu">
                 <div className="profile-menu-header">
-                  <div className="profile-name">{user.name || 'Utilisateur'}</div>
-                  <div className="profile-email">{user.email}</div>
+                  <div className="profile-name">{currentUser?.first_name || 'Utilisateur'}</div>
+                  <div className="profile-email">{currentUser?.email}</div>
                 </div>
                 
                 <div className="profile-menu-items">
@@ -177,7 +183,7 @@ export const Header = ({ onMenuToggle, user, onLogout, onNavChange }) => {
                     className="profile-menu-item"
                     onClick={() => {
                       setShowProfileMenu(false);
-                      onNavChange && onNavChange('profile');
+                      navigate('/profile');
                     }}
                   >
                     <User size={18} variant="Outline" />
@@ -189,11 +195,12 @@ export const Header = ({ onMenuToggle, user, onLogout, onNavChange }) => {
                     <span>Paramètres</span>
                   </button>
                   
-                  <button 
+                  <button
                     className="profile-menu-item logout"
                     onClick={() => {
                       setShowProfileMenu(false);
-                      onLogout && onLogout();
+                      authService.logout();
+                      navigate('/login');
                     }}
                   >
                     <LogoutCurve size={18} variant="Outline" />

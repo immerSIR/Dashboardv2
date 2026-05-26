@@ -1,82 +1,137 @@
-import { useState } from 'react';
-import { Login } from './pages/auth';
+import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Login, ForgotPassword, ResetPassword } from './pages/auth';
 import { Dashboard } from './pages/dashboard';
 import { Collaboration } from './pages/collaboration';
-import { CollaborationProject } from './pages/collaboration-project';
+import { CollaborationDetail } from './pages/collaboration-detail';
+import { Incident, IncidentDetailPage } from './pages/incident';
 import { Impact } from './pages/impact';
 import { Profile } from './pages/profile';
+import { TrashPage } from './pages/trash';
+import { Organisations } from './pages/organisations';
+import { Agents } from './pages/agents';
+import { ProtectedRoute } from './components/auth';
+import { authService } from './pages/auth/services/authService';
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
-  const [activeNav, setActiveNav] = useState('dashboard');
+  const [isAuthChecked, setIsAuthChecked] = useState(false);
 
-  const handleLogin = (credentials) => {
-    console.log('Login attempt:', credentials);
-    setUser({ email: credentials.email });
-    setIsAuthenticated(true);
-  };
+  // Vérifie l'authentification au chargement de l'app
+  useEffect(() => {
+    authService.isAuthenticated();
+    setIsAuthChecked(true);
+  }, []);
 
-  const handleLogout = () => {
-    setUser(null);
-    setIsAuthenticated(false);
-  };
-
-  const renderPage = () => {
-    switch (activeNav) {
-      case 'collaboration':
-        return (
-          <Collaboration
-            onLogout={handleLogout}
-            user={user}
-            activeNav={activeNav}
-            onNavChange={setActiveNav}
-          />
-        );
-      case 'projects':
-        return (
-          <CollaborationProject
-            onLogout={handleLogout}
-            user={user}
-            activeNav={activeNav}
-            onNavChange={setActiveNav}
-          />
-        );
-      case 'profile':
-        return (
-          <Profile
-            onLogout={handleLogout}
-            user={user}
-            activeNav={activeNav}
-            onNavChange={setActiveNav}
-          />
-        );
-      case 'impact':
-        return (
-          <Impact
-            onLogout={handleLogout}
-            user={user}
-            activeNav={activeNav}
-            onNavChange={setActiveNav}
-          />
-        );
-      case 'dashboard':
-      default:
-        return (
-          <Dashboard
-            onLogout={handleLogout}
-            user={user}
-            activeNav={activeNav}
-            onNavChange={setActiveNav}
-          />
-        );
-    }
-  };
+  if (!isAuthChecked) {
+    return null; // ou un loader
+  }
 
   return (
-    <>
-      {!isAuthenticated ? <Login onLogin={handleLogin} /> : renderPage()}
-    </>
+    <BrowserRouter>
+      <Routes>
+        {/* Route publique - Login */}
+        <Route path="/login" element={<Login onLogin={() => {}} />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+
+        {/* Routes protégées */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/collaboration"
+          element={
+            <ProtectedRoute>
+              <Collaboration />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/collaboration/:id"
+          element={
+            <ProtectedRoute>
+              <CollaborationDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/collaboration-detail/:id"
+          element={
+            <ProtectedRoute>
+              <CollaborationDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/incidents"
+          element={
+            <ProtectedRoute>
+              <Incident />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/incidents/:id"
+          element={
+            <ProtectedRoute>
+              <IncidentDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/impact"
+          element={
+            <ProtectedRoute>
+              <Impact />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/trash"
+          element={
+            <ProtectedRoute>
+              <TrashPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/organisations"
+          element={
+            <ProtectedRoute>
+              <Organisations />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/agents"
+          element={
+            <ProtectedRoute>
+              <Agents />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Redirections */}
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
