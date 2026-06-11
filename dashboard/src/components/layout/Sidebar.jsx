@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Element4, People, ProfileCircle, Clock, Briefcase, Award, Trash, Buildings2, Profile2User } from 'iconsax-react';
+import { Element4, People, ProfileCircle, Clock, Briefcase, Award, Trash, Buildings2, Profile2User, Lock1 } from 'iconsax-react';
 import logoMapAction from '../../assets/logo.svg';
 import logoMapActionMin from '../../assets/logo-min.svg';
 import './sidebar.css';
@@ -11,17 +11,22 @@ import {
   People as IconsaxPeople  
 } from 'iconsax-react';
  
-export const Sidebar = ({ isOpen, onClose, isCollapsed: controlledCollapsed, onCollapsedChange }) => {
+export const Sidebar = ({ isOpen, onClose, isCollapsed: controlledCollapsed, onCollapsedChange, onToggleCollapse }) => {
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const isCollapsed = controlledCollapsed !== undefined ? controlledCollapsed : internalCollapsed;
-  const setIsCollapsed = onCollapsedChange ? (val) => onCollapsedChange(val) : setInternalCollapsed;
-  
+
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   const handleToggleCollapsed = () => {
     const newCollapsedState = !isCollapsed;
-    setIsCollapsed(newCollapsedState);
+    if (onCollapsedChange) {
+      onCollapsedChange(newCollapsedState);
+    } else if (onToggleCollapse) {
+      onToggleCollapse();
+    } else {
+      setInternalCollapsed(newCollapsedState);
+    }
   };
   const navItems = [
     {
@@ -41,6 +46,12 @@ export const Sidebar = ({ isOpen, onClose, isCollapsed: controlledCollapsed, onC
       label: 'Incidents',
       icon: Briefcase,
       path: '/incidents'
+    },
+    {
+      id: 'implication-privee',
+      label: 'Implication privée',
+      icon: Lock1,
+      path: '/implication-privee'
     },
     {
       id: 'organisations',
@@ -83,7 +94,12 @@ export const Sidebar = ({ isOpen, onClose, isCollapsed: controlledCollapsed, onC
     }
   };
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) => {
+    if (location.pathname === path) return true;
+    if (path !== '/' && location.pathname.startsWith(path + '/')) return true;
+    if (path === '/collaboration' && location.pathname.startsWith('/collaboration-detail')) return true;
+    return false;
+  };
 
   return (
     <>

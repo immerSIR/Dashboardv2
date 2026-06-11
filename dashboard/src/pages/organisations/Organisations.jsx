@@ -41,6 +41,7 @@ const EMPTY_FORM = {
   description: '',
   status: 'active',
   logo_url: null,
+  logo: null,
 };
 
 export const Organisations = () => {
@@ -115,9 +116,9 @@ export const Organisations = () => {
   const [modalAlert, setModalAlert] = useState({ type: null, message: null });
   const [deleteAlert, setDeleteAlert] = useState({ type: null, message: null });
 
-  // Animations de fermeture
-  const [formClosing, setFormClosing] = useState(false);
-  const [deleteClosing, setDeleteClosing] = useState(false);
+  // Animations
+  const [formAnimating, setFormAnimating] = useState(false);
+  const [deleteAnimating, setDeleteAnimating] = useState(false);
 
   // Soumission en cours
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -156,7 +157,9 @@ export const Organisations = () => {
     setForm(EMPTY_FORM);
     setFormErrors({});
     setModalAlert({ type: null, message: null });
+    setFormAnimating('opening');
     setFormModal({ open: true, mode: 'create', org: null });
+    setTimeout(() => setFormAnimating(false), 350);
   };
 
   // ── Ouvrir modal édition ─────────────────────────────────
@@ -176,33 +179,42 @@ export const Organisations = () => {
       description: org.description,
       status: org.status,
       logo_url: org.logo_url || null,
+      logo: null,
     });
     setFormErrors({});
     setModalAlert({ type: null, message: null });
+    setFormAnimating('opening');
     setFormModal({ open: true, mode: 'edit', org });
+    setTimeout(() => setFormAnimating(false), 350);
   };
 
   // ── Gestion de la photo ──────────────────────────────────
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    setField('logo', file);
     const reader = new FileReader();
-    reader.onload = (ev) => setField('logo_url', ev.target.result);
+    reader.onload = (ev) => {
+      setField('logo_url', ev.target.result);
+    };
     reader.readAsDataURL(file);
   };
 
   const removePhoto = (e) => {
     e.stopPropagation();
     setField('logo_url', null);
+    setField('logo', null);
   };
 
   // ── Fermer le modal form ─────────────────────────────────
   const closeFormModal = () => {
-    setFormClosing(true);
+    if (isSubmitting) return;
+    setFormAnimating('closing');
     setTimeout(() => {
       setFormModal({ open: false, mode: 'create', org: null });
-      setFormClosing(false);
-    }, 200);
+      setFormAnimating(false);
+      setModalAlert({ type: null, message: null });
+    }, 320);
   };
 
   // ── Validation ───────────────────────────────────────────
@@ -220,9 +232,11 @@ export const Organisations = () => {
 
   // ── Soumettre le formulaire ──────────────────────────────
   const buildPayload = (formData) => {
+    const subdomainVal = formData.name
+      ? formData.name.trim().toLowerCase().replace(/\s+/g, '_')
+      : '';
 
-
-    return {
+    const payload = {
       name: formData.name,
       acronym: formData.acronym || null,
       description: formData.description || null,
@@ -235,9 +249,16 @@ export const Organisations = () => {
       primary_color: formData.color || '#3AA2DD',
       is_premium: true,
       members_count: 0,
-      logo_url: formData.logo_url || '',
-      subdomain: formData.website,
+      subdomain: subdomainVal,
     };
+
+    if (formData.logo) {
+      payload.logo = formData.logo;
+    } else if (formData.logo_url === null) {
+      payload.logo = null;
+    }
+
+    return payload;
   };
 
   const handleSubmit = async () => {
@@ -273,15 +294,18 @@ export const Organisations = () => {
   const openDelete = (org, e) => {
     e.stopPropagation();
     setDeleteAlert({ type: null, message: null });
+    setDeleteAnimating('opening');
     setDeleteModal({ open: true, org });
+    setTimeout(() => setDeleteAnimating(false), 350);
   };
 
   const closeDeleteModal = () => {
-    setDeleteClosing(true);
+    if (isDeleting) return;
+    setDeleteAnimating('closing');
     setTimeout(() => {
       setDeleteModal({ open: false, org: null });
-      setDeleteClosing(false);
-    }, 200);
+      setDeleteAnimating(false);
+    }, 320);
   };
 
   const confirmDelete = async (e) => {
@@ -314,9 +338,9 @@ export const Organisations = () => {
   };
 
   const contextValue = {
-    formModal, formClosing, closeFormModal, modalAlert, form, formErrors,
+    formModal, formAnimating, closeFormModal, modalAlert, form, formErrors,
     setField, handlePhotoChange, removePhoto, isSubmitting, handleSubmit,
-    deleteModal, setDeleteModal, deleteClosing, isDeleting, deleteAlert,
+    deleteModal, setDeleteModal, deleteAnimating, isDeleting, deleteAlert,
     closeDeleteModal, confirmDelete
   };
 

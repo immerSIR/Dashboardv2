@@ -17,9 +17,9 @@ export const getIncidentsService = async (page = 1, pageSize = 10) => {
   try {
     const axios = authService.createAuthenticatedAxios();
     const response = await axios.get(
-      `${API_URL_BASE}/MapApi/${INCIDENT_URL}`,
+      `${API_URL_BASE}/MapApi/${INCIDENT_URL}/`,
       {
-        params: { page, page_size: pageSize }
+        // params: { page, page_size: pageSize }
       }
     );
 
@@ -28,6 +28,26 @@ export const getIncidentsService = async (page = 1, pageSize = 10) => {
     return response.data;
   } catch (error) {
     console.error('[Incident] Erreur récupération incidents:', error.response?.status, error.response?.data);
+    throw error;
+  }
+};
+
+
+/**
+ * Récupère les incidents résolus
+ * @returns {Promise<Object>} - { count, next, previous, results }
+ */
+export const getResolvedIncidentsService = async () => {
+  try {
+    const axios = authService.createAuthenticatedAxios();
+    const response = await axios.get(
+      `${API_URL_BASE}/MapApi/incidentResolved/`
+    );
+
+    console.log('[Incident] Incidents résolus récupérés:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('[Incident] Erreur récupération incidents résolus:', error.response?.status, error.response?.data);
     throw error;
   }
 };
@@ -112,7 +132,7 @@ export const updateIncidentService = async (id, updates) => {
   try {
     const axios = authService.createAuthenticatedAxios();
     const response = await axios.put(
-      `${API_URL_BASE}/MapApi/${INCIDENT_URL}/${id}/`,
+      `${API_URL_BASE}/MapApi/${INCIDENT_URL}s/${id}/`,
       updates
     );
 
@@ -132,7 +152,7 @@ export const updateIncidentService = async (id, updates) => {
 export const deleteIncidentService = async (id) => {
   try {
     const axios = authService.createAuthenticatedAxios();
-    await axios.delete(`${API_URL_BASE}/MapApi/${INCIDENT_URL}/${id}/`);
+    await axios.delete(`${API_URL_BASE}/MapApi/${INCIDENT_URL}/${id}`);
 
     console.log('[Incident] Incident supprimé:', id);
   } catch (error) {
@@ -146,11 +166,12 @@ export const deleteIncidentService = async (id) => {
  * @param {number} incidentId 
  * @returns 
  */
-export const takeInChargeIncidentService = async (incidentId) => {
+export const takeInChargeIncidentService = async (incidentId, data = null) => {
   try {
     const axios = authService.createAuthenticatedAxios();
     const response = await axios.post(
-      `${API_URL_BASE}/MapApi/${INCIDENT_URL}/${incidentId}/take_in_charge/`
+      `${API_URL_BASE}/MapApi/${INCIDENT_URL}s/${incidentId}/take_in_charge/`,
+      data
     );
 
     return response.data;
@@ -209,7 +230,7 @@ export const getOrgIncidentsService = async (source = 'all') => {
   try {
     const axios = authService.createAuthenticatedAxios();
     const response = await axios.get(
-      `${API_URL_BASE}/MapApi/org-${INCIDENT_URL}`,
+      `${API_URL_BASE}/MapApi/org-${INCIDENTS_URL}/`,
       {
         params: { source }
       }
@@ -232,7 +253,7 @@ export const togglePublicIncidentService = async (incidentId) => {
   try {
     const axios = authService.createAuthenticatedAxios();
     const response = await axios.post(
-      `${API_URL_BASE}/MapApi/${INCIDENT_URL}/${incidentId}/toggle-public/`
+      `${API_URL_BASE}/MapApi/${INCIDENTS_URL}/${incidentId}/toggle-public/`
     );
 
     console.log('[Incident] Visibilité basculée:', response.data);
@@ -240,6 +261,45 @@ export const togglePublicIncidentService = async (incidentId) => {
   } catch (error) {
     console.error('[Incident] Erreur basculement visibilité:', error.response?.status, error.response?.data);
     throw error?.response?.data || error;
+  }
+};
+
+/**
+ * Récupère les assignations d'incident a un agents
+ * @returns {Promise<Array>} 
+ */
+export const assignIncidentToAgentService = async (incidentId = null, data = null) => {
+  try {
+    const axios = authService.createAuthenticatedAxios();
+    if (incidentId) {
+      const payload = {
+        incident: incidentId,
+        user_id: data?.taken_by,
+        deadline: data?.deadline,
+        ...data
+      };
+      console.log('[Incident] Envoi assignation via assignIncidentToAgentService:', payload);
+      const response = await axios.post(
+        `${API_URL_BASE}/MapApi/agent/assigned-incidents/`,
+        payload
+      );
+      console.log('[Incident] Incident assigné:', response.data);
+      return response.data;
+    }
+
+    const response = await axios.get(
+      `${API_URL_BASE}/MapApi/agent/assigned-incidents/`
+    );
+
+    console.log('[Incident] Incidents assignés récupérés:', response.data);
+    return response.data?.results || response.data || [];
+  } catch (error) {
+    console.error(
+      `[Incident] Erreur ${incidentId ? 'assignation' : 'récupération'} incidents assignés:`,
+      error.response?.status,
+      error.response?.data
+    );
+    throw error;
   }
 };
 
@@ -252,9 +312,23 @@ export const togglePublicIncidentService = async (incidentId) => {
 export const closeIncidentService = async (incidentId, data) => {
   try {
     const axios = authService.createAuthenticatedAxios();
+    
+    let payload = data;
+    let headers = {};
+
+    if (data && data.resolution_file) {
+      const formData = new FormData();
+      formData.append('resolution_start_date', data.resolution_start_date);
+      formData.append('resolution_end_date', data.resolution_end_date);
+      formData.append('resolution_file', data.resolution_file);
+      payload = formData;
+      headers['Content-Type'] = 'multipart/form-data';
+    }
+
     const response = await axios.post(
-      `${API_URL_BASE}/MapApi/${INCIDENT_URL}/${incidentId}/close/`,
-      data
+      `${API_URL_BASE}/MapApi/${INCIDENT_URL}s/${incidentId}/close/`,
+      payload,
+      { headers }
     );
 
     console.log('[Incident] Incident clôturé:', response.data);
@@ -388,6 +462,7 @@ const getEtatColor = (etat) => {
 
 export default {
   getIncidentsService,
+  getResolvedIncidentsService,
   getIncidentService,
   getIncidentPredictionService,
   createIncidentService,
@@ -397,6 +472,7 @@ export default {
   getIncidentsByCategoryService,
   getOrgIncidentsService,
   togglePublicIncidentService,
+  assignIncidentToAgentService,
   takeInChargeIncidentService,
   closeIncidentService,
   getTrashIncidentsService,

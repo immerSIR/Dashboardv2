@@ -6,7 +6,7 @@ const DeleteOrganisationModal = () => {
   const {
     deleteModal,
     setDeleteModal,
-    deleteClosing,
+    deleteAnimating,
     isDeleting,
     deleteAlert,
     closeDeleteModal,
@@ -15,52 +15,78 @@ const DeleteOrganisationModal = () => {
 
   if (!deleteModal.open) return null;
 
-  return (
-    <div
-      className={`orgs-modal-overlay ${deleteClosing ? 'closing' : ''}`}
-      onClick={() => !(isDeleting || deleteAlert.type === 'success') && closeDeleteModal()}
-    >
-      <div className={`orgs-modal orgs-confirm-modal ${deleteClosing ? 'closing' : ''}`} onClick={(e) => e.stopPropagation()}>
-        <div className="orgs-confirm-body">
-          <div className="orgs-confirm-icon">
-            <Trash size={30} variant="Bold" color="var(--color-danger)" />
-          </div>
-          <h2 className="orgs-confirm-title">Supprimer l'organisation</h2>
-          <p className="orgs-confirm-text" style={{ marginBottom: deleteAlert.message ? '10px' : '20px' }}>
-            Vous êtes sur le point de supprimer <strong>"{deleteModal.org?.name}"</strong>. Cette action est <strong>irréversible</strong>.
-          </p>
+  const isClosing = deleteAnimating === 'closing';
+  const panelClass = [
+    'am-offcanvas-panel',
+    'am-offcanvas-panel--sm',
+    isClosing ? 'am-offcanvas-panel--closing' : '',
+    deleteAnimating === 'opening' ? 'am-offcanvas-panel--opening' : '',
+  ].filter(Boolean).join(' ');
 
+  const backdropClass = [
+    'am-offcanvas-backdrop',
+    isClosing ? 'am-offcanvas-backdrop--closing' : '',
+  ].filter(Boolean).join(' ');
+
+  return (
+    <>
+      <div className={backdropClass} onClick={() => !(isDeleting || deleteAlert.type === 'success') && closeDeleteModal()} />
+      <div
+        className={panelClass}
+        role="alertdialog"
+        aria-modal="true"
+        aria-label="Supprimer l'organisation"
+      >
+        <div className="am-offcanvas-header am-offcanvas-header--danger">
+          <h5 className="am-offcanvas-title">Supprimer l'organisation</h5>
+          <button
+            type="button"
+            className="btn-close btn-close-white"
+            onClick={closeDeleteModal}
+            disabled={isDeleting || deleteAlert.type === 'success'}
+            aria-label="Fermer"
+          />
+        </div>
+
+        <div className="am-offcanvas-body am-offcanvas-body--centered">
           {deleteAlert.message && (
-            <div className={`orgs-bootstrap-alert alert-${deleteAlert.type}`} style={{ width: '100%', boxSizing: 'border-box' }}>
+            <div className={`am-alert am-alert--${deleteAlert.type === 'success' ? 'success' : 'danger'}`} role="alert" style={{ width: '100%' }}>
               {deleteAlert.type === 'success' ? <TickCircle size={18} variant="Bold" /> : <CloseCircle size={18} variant="Bold" />}
-              <span>{deleteAlert.message}</span>
+              <span className="am-alert__message" style={{ textAlign: 'left' }}>{deleteAlert.message}</span>
             </div>
           )}
 
-          <div className="orgs-confirm-actions">
-            <button
-              className="orgs-btn-cancel"
-              onClick={closeDeleteModal}
-              disabled={isDeleting || deleteAlert.type === 'success'}
-            >
-              Annuler
-            </button>
-            <button
-              className="orgs-btn-confirm-delete"
-              onClick={confirmDelete}
-              disabled={isDeleting || deleteAlert.type === 'success'}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-            >
-              {isDeleting && <span className="orgs-spinner" />}
-              {isDeleting
-                ? 'Suppression...'
-                : (deleteAlert.type === 'success' ? 'Succès !' : 'Supprimer')
-              }
-            </button>
+          <div className="am-delete-icon-wrap" aria-hidden="true">
+            <Trash size={32} variant="Bold" color="var(--color-danger)" />
           </div>
+
+          <p className="am-delete-title">Confirmer la suppression</p>
+          <p className="am-delete-text">
+            Vous êtes sur le point de supprimer <strong>"{deleteModal.org?.name}"</strong>. Cette action est <strong>irréversible</strong>.
+          </p>
+        </div>
+
+        <div className="am-offcanvas-footer am-offcanvas-footer--col">
+          <button
+            type="button"
+            className="am-btn am-btn--danger"
+            onClick={confirmDelete}
+            disabled={isDeleting || deleteAlert.type === 'success'}
+          >
+            {isDeleting && <span className="am-spinner" aria-hidden="true" />}
+            {isDeleting ? 'Suppression...' : 'Supprimer définitivement'}
+          </button>
+          <button
+            type="button"
+            className="am-btn am-btn--outline"
+            onClick={closeDeleteModal}
+            disabled={isDeleting || deleteAlert.type === 'success'}
+          >
+            Annuler
+          </button>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

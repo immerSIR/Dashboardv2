@@ -84,6 +84,13 @@
   font-weight: var(--font-weight-semibold);
 }
 
+.collab-detail-main-wrapper {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 /* Content - 3 colonnes avec scroll indépendant */
 .collab-detail-content {
   display: grid;
@@ -94,6 +101,11 @@
   min-height: 0;
   height: calc(100% - 80px);
   /* 80px = hauteur du header de la page */
+}
+
+/* Ajustement automatique des colonnes quand la barre latérale principale (Sidebar) est repliée */
+.collab-detail-main-wrapper.sidebar-collapsed .collab-detail-content {
+  grid-template-columns: 420px 1fr 380px;
 }
 
 .collab-detail-sidebar,
@@ -209,6 +221,120 @@
   color: var(--color-text-secondary);
 }
 
+/* Custom premium details classes */
+.collab-detail-subsection {
+  margin-bottom: var(--spacing-6);
+  padding-bottom: var(--spacing-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.collab-detail-subsection:last-of-type {
+  border-bottom: none;
+  margin-bottom: var(--spacing-4);
+  padding-bottom: 0;
+}
+
+.collab-detail-subsection-title {
+  font-size: var(--font-size-body-small);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-primary);
+  margin-top: 0;
+  margin-bottom: var(--spacing-4);
+}
+
+.collab-detail-meta-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.collab-detail-meta-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.collab-detail-meta-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+}
+
+.collab-detail-meta-val {
+  font-size: var(--font-size-body);
+  color: var(--color-text-primary);
+  line-height: 1.5;
+}
+
+.collab-detail-meta-val.text-highlight {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.collab-detail-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--font-size-body-small);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+}
+
+.collab-detail-badge.badge-primary {
+  color: var(--color-primary);
+}
+
+.collab-detail-badge.badge-success {
+  color: var(--color-success);
+}
+
+.collab-detail-badge.badge-warning {
+  color: #F59E0B;
+}
+
+.collab-detail-badge.badge-danger {
+  color: var(--color-danger);
+}
+
+.collab-detail-badge.badge-info {
+  color: var(--color-text-muted);
+}
+
+.collab-detail-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.collab-detail-tag {
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  padding: 2px 8px;
+  color: var(--color-primary);
+  border: 1px solid rgba(58, 162, 221, 0.3);
+  border-radius: var(--radius-full);
+}
+
+.collab-detail-gravity-badge {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-body);
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.collab-detail-gravity-max {
+  font-size: var(--font-size-body-small);
+  color: var(--color-text-muted);
+  font-weight: normal;
+}
+
 /* Progression */
 .collab-detail-progress {
   display: flex;
@@ -307,6 +433,8 @@
 
 .collab-message.is-me {
   flex-direction: row-reverse;
+  width: fit-content;
+  align-self: flex-end !important;
 }
 
 .collab-message-avatar {
@@ -324,7 +452,8 @@
 
 .collab-message-content {
   flex: 1;
-  max-width: fit-content;
+  max-width: 70%;
+  min-width: 0;
 }
 
 .collab-message.is-me .collab-message-content {
@@ -348,6 +477,9 @@
   color: var(--color-text-primary);
   line-height: 1.5;
   word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
 
 .collab-message.is-me .collab-message-bubble {
@@ -700,7 +832,8 @@
 }
 
 .collab-task-fail-btn,
-.collab-task-reset-btn {
+.collab-task-reset-btn,
+.collab-task-delete-btn {
   flex-shrink: 0;
   background: transparent;
   border: none;
@@ -710,7 +843,8 @@
   transition: background-color 0.2s ease;
 }
 
-.collab-task-fail-btn:hover {
+.collab-task-fail-btn:hover,
+.collab-task-delete-btn:hover {
   background-color: rgba(239, 68, 68, 0.1);
 }
 
@@ -861,10 +995,21 @@
   .collab-detail-tasks {
     border: none;
     border-bottom: 1px solid var(--color-border);
+    max-height: 350px;
+    overflow-y: auto;
+  }
+
+  .collab-detail-main {
+    min-height: 500px;
   }
 
   .collab-discussion {
-    height: 500px;
+    height: 100%;
+    min-height: 400px;
+  }
+
+  .collab-discussion-messages {
+    max-height: calc(100% - 80px);
   }
 }
 
@@ -989,6 +1134,70 @@
   .collab-discussion {
     height: calc(100vh - 220px) !important;
   }
+
+  .collab-discussion-messages {
+    padding: var(--spacing-3);
+  }
+
+  /* Messages responsive */
+  .collab-message {
+    margin-bottom: var(--spacing-3);
+    max-width: 100%;
+  }
+
+  .collab-message-content {
+    max-width: 85%;
+    min-width: 0;
+  }
+
+  .collab-message-bubble {
+    padding: var(--spacing-2) var(--spacing-3);
+    font-size: 0.95rem;
+    max-width: 100%;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .collab-message-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 0.75rem;
+  }
+
+  .collab-message-sender {
+    font-size: 0.75rem;
+  }
+
+  .collab-message-time {
+    font-size: 0.7rem;
+  }
+
+  /* Input de discussion sur mobile */
+  .collab-discussion-input {
+    padding: var(--spacing-3);
+  }
+
+  .collab-discussion-field {
+    padding: var(--spacing-2) var(--spacing-3);
+    font-size: 0.95rem;
+  }
+
+  .collab-discussion-attach,
+  .collab-discussion-send {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* Fichiers dans les messages */
+  .collab-message-file {
+    max-width: 100%;
+    padding: var(--spacing-2);
+  }
+
+  .collab-message-file-info {
+    min-width: 0;
+    overflow: hidden;
+  }
 }
 
 /* Bouton de création de tâche */
@@ -1019,13 +1228,186 @@
 }
 
 /* ============================================
-   MODAL TÂCHES
+   TASKS MODAL BOOTSTRAP (slide depuis la droite)
+   ============================================ */
+.modal.tasks-modal-bootstrap.fade .modal-dialog {
+  transform: translateX(100%);
+  transition: transform 0.3s ease-out;
+}
+
+.modal.tasks-modal-bootstrap.show .modal-dialog {
+  transform: translateX(0);
+}
+
+.modal.tasks-modal-bootstrap.fade:not(.show) .modal-dialog {
+  transform: translateX(100%);
+}
+
+.modal.tasks-modal-bootstrap .modal-dialog {
+  margin: 0;
+  margin-left: auto;
+  max-width: 700px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal.tasks-modal-bootstrap .modal-content {
+  height: 100%;
+  border-radius: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  max-height: 100vh;
+}
+
+.modal.tasks-modal-bootstrap .modal-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal.tasks-modal-bootstrap .modal-header,
+.modal.tasks-modal-bootstrap .modal-footer {
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .modal.tasks-modal-bootstrap .modal-dialog {
+    max-width: 100%;
+    height: 100dvh;
+  }
+
+  .modal.tasks-modal-bootstrap .modal-content {
+    max-height: 100dvh;
+  }
+
+  .modal.tasks-modal-bootstrap .modal-header {
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+    border-bottom: 1px solid #dee2e6;
+  }
+
+  .modal.tasks-modal-bootstrap .modal-footer {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    z-index: 10;
+    border-top: 1px solid #dee2e6;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+  }
+
+  /* Messages encore plus compacts sur petit écran */
+  .collab-message-content {
+    max-width: 80%;
+  }
+
+  .collab-detail-header {
+    padding: var(--spacing-3);
+  }
+
+  .collab-detail-title {
+    font-size: 1.1rem;
+  }
+
+  .collab-detail-subtitle {
+    font-size: 0.85rem;
+  }
+
+  .collab-discussion-input {
+    position: fixed;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    bottom: 70px;
+    padding-bottom: 30px;
+  }
+
+  .collab-discussion-messages {
+    padding-bottom: 85px;
+  }
+}
+
+@media (max-width: 480px) {
+  .collab-detail-header {
+    padding: var(--spacing-2);
+    height: auto;
+    min-height: 60px;
+  }
+
+  .collab-detail-title {
+    font-size: 1rem;
+  }
+
+  .collab-detail-subtitle {
+    font-size: 0.8rem;
+  }
+
+  .collab-detail-back {
+    padding: var(--spacing-1) var(--spacing-2);
+    font-size: 0.85rem;
+  }
+
+  /* Messages très compacts */
+  .collab-message {
+    gap: var(--spacing-2);
+  }
+
+  .collab-message-content {
+    max-width: 75%;
+  }
+
+  .collab-message-bubble {
+    padding: var(--spacing-2);
+    font-size: 0.9rem;
+  }
+
+  .collab-message-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 0.7rem;
+  }
+
+  .collab-discussion-input {
+    padding: var(--spacing-2);
+  }
+
+  .collab-discussion-field {
+    font-size: 0.9rem;
+    padding: var(--spacing-2);
+  }
+
+  .collab-discussion-attach,
+  .collab-discussion-send {
+    width: 36px;
+    height: 36px;
+  }
+
+  .collab-discussion {
+    height: calc(100vh - 200px) !important;
+  }
+
+  .collab-mobile-nav {
+    padding: var(--spacing-1) var(--spacing-2);
+    height: 60px;
+  }
+
+  .collab-mobile-nav-item {
+    padding: var(--spacing-1);
+    font-size: 0.7rem;
+  }
+}
+
+/* ============================================
+   MODAL TÂCHES (OLD - À CONSERVER TEMPORAIREMENT)
    ============================================ */
 .tasks-modal-overlay {
   position: fixed;
   inset: 0;
   background-color: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
+  z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -1235,7 +1617,7 @@
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
-  margin-top: var(--spacing-1);
+  margin-top: var(--spacing-3);
 }
 
 .tasks-add-label .required {
@@ -1552,7 +1934,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-1);
-  font-size: var(--font-size-body-small);
+  font-size: var(--font-size-body);
+  padding-top: 30px;
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
 }

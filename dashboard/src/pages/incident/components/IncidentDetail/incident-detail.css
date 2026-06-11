@@ -649,13 +649,86 @@
 }
 
 /* ============================================
-   JOIN ACTION MODAL (slide depuis la droite)
+   JOIN ACTION MODAL BOOTSTRAP (slide depuis la droite)
+   ============================================ */
+.modal.join-modal-bootstrap.fade .modal-dialog {
+  transform: translateX(100%);
+  transition: transform 0.3s ease-out;
+}
+
+.modal.join-modal-bootstrap.show .modal-dialog {
+  transform: translateX(0);
+}
+
+.modal.join-modal-bootstrap.fade:not(.show) .modal-dialog {
+  transform: translateX(100%);
+}
+
+.modal.join-modal-bootstrap .modal-dialog {
+  margin: 0;
+  margin-left: auto;
+  max-width: 600px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal.join-modal-bootstrap .modal-content {
+  height: 100%;
+  border-radius: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  max-height: 100vh;
+}
+
+.modal.join-modal-bootstrap .modal-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal.join-modal-bootstrap .modal-header,
+.modal.join-modal-bootstrap .modal-footer {
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .modal.join-modal-bootstrap .modal-dialog {
+    max-width: 100%;
+    height: 100dvh;
+  }
+
+  .modal.join-modal-bootstrap .modal-content {
+    max-height: 100dvh;
+  }
+
+  .modal.join-modal-bootstrap .modal-header {
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+    border-bottom: 1px solid #dee2e6;
+  }
+
+  .modal.join-modal-bootstrap .modal-footer {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    z-index: 10;
+    border-top: 1px solid #dee2e6;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+  }
+}
+
+/* ============================================
+   OLD STYLES (À SUPPRIMER APRÈS MIGRATION)
    ============================================ */
 .join-modal-overlay {
   position: fixed;
   inset: 0;
   background-color: rgba(15, 23, 42, 0.45);
-  z-index: 1000;
+  z-index: 9999;
   display: flex;
   justify-content: flex-end;
   animation: overlayFadeIn 0.25s ease forwards;
@@ -1181,8 +1254,60 @@
     flex: 1;
   }
 
+  .project-detail .detail-header {
+    padding: var(--spacing-3) var(--spacing-4);
+  }
+
+  .project-detail .detail-title-block {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 50px;
+  }
+
   .project-detail .detail-title {
     font-size: 18px;
+    width: calc(100% - 48px);
+    flex: none;
+  }
+
+  /* Skeleton overrides for title on mobile */
+  .detail-title-skeleton {
+    flex: none !important;
+    width: calc(100% - 60px) !important;
+    max-width: none !important;
+    margin-left: 8px !important;
+  }
+
+  /* Badges responsiveness on mobile */
+  .detail-status-badge-custom,
+  .detail-visibility-badge-custom,
+  .detail-badges-skeleton {
+    order: 3;
+  }
+
+  .detail-badges-skeleton {
+    margin-left: 0 !important;
+  }
+
+  /* Action buttons full-width at the bottom on mobile */
+  .detail-action-btn-custom,
+  .detail-action-btn-skeleton {
+    order: 4;
+    width: 100% !important;
+    margin-left: 0 !important;
+    justify-content: center;
+    margin-top: 8px;
+  }
+
+  /* Metadata items */
+  .project-detail .detail-meta {
+    gap: 8px 16px;
+    margin-top: 12px;
+  }
+
+  .project-detail .detail-meta-item {
+    font-size: var(--font-size-body-small);
   }
 }
 

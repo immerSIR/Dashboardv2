@@ -29,7 +29,6 @@ import {
   Trash
 } from 'iconsax-react';
 import { Header, Sidebar } from '../../components/layout';
-import { collaborations as allCollaborations } from './data/collaborations';
 import { CollaborationRequests } from '../collaboration-requests';
 import { getCollaborationsService } from './service/collaboration_service';
 import { ShimmerThumbnail, ShimmerTitle, ShimmerText } from 'react-shimmer-effects';
@@ -132,20 +131,25 @@ export const Collaboration = () => {
     return swrData.map(collab => {
       const createdDate = new Date(collab.created_at);
       const endDate = collab.end_date ? new Date(collab.end_date) : null;
+      const incidentTitle = collab.incident_details?.title || collab.incident_title || `Incident #${collab.incident}`;
+      const incidentImage = collab.incident_details?.photo || collab.incident_details?.image || '';
+      const orgName = collab.organisation_name || collab.user_full_name || `Utilisateur #${collab.user}`;
+      const incidentLocation = collab.incident_details?.zone || 'À définir';
+      const incidentDescription = collab.incident_details?.description || collab.motivation || 'Aucune description';
+      const incidentProgress = collab.incident_details?.progress || 0;
 
       return {
         id: collab.id,
         userRole: collab.role,
-        title: `Incident #${collab.incident}`,
+        title: incidentTitle,
         incidentId: collab.incident,
         userId: collab.user,
-        status: collab.status,
+        status: collab.status === 'accepted' ? 'in-progress' : collab.status,
         createdAt: collab.created_at,
         motivation: collab.motivation,
-        endDate: collab.end_date,
         otherOption: collab.other_option,
-        image: '',
-        organisation: `Utilisateur #${collab.user}`,
+        image: incidentImage,
+        organisation: orgName,
         role: collab.role,
         joinedAt: createdDate.toLocaleDateString('fr-FR', {
           day: 'numeric',
@@ -164,10 +168,10 @@ export const Collaboration = () => {
         }) : 'Non défini',
         startAt: collab.created_at,
         endAt: collab.end_date,
-        location: 'À définir',
-        description: collab.motivation || 'Aucune description',
-        progress: 0,
-        tasks: []
+        location: incidentLocation,
+        description: incidentDescription,
+        progress: incidentProgress,
+        tasks: collab.tasks || []
       };
     });
   }, [swrData]);
@@ -452,7 +456,7 @@ export const Collaboration = () => {
 
   // Sauvegarder la progression
   const saveProgress = (collabId) => {
-    const collab = allCollaborations.find(c => c.id === collabId);
+    const collab = collaborations.find(c => c.id === collabId);
     if (!collab) return;
     setSavedProgress(prev => ({
       ...prev,
@@ -462,7 +466,7 @@ export const Collaboration = () => {
 
   // Clôturer une collaboration
   const closeCollaboration = (collabId) => {
-    const collab = allCollaborations.find(c => c.id === collabId);
+    const collab = collaborations.find(c => c.id === collabId);
     if (!collab) return;
     setSavedProgress(prev => ({
       ...prev,
@@ -479,13 +483,13 @@ export const Collaboration = () => {
 
   const counts = useMemo(
     () => ({
-      all: allCollaborations.length,
-      'in-progress': allCollaborations.filter((c) => c.status === 'in-progress')
+      all: collaborations.length,
+      'in-progress': collaborations.filter((c) => c.status === 'in-progress')
         .length,
-      completed: allCollaborations.filter((c) => c.status === 'completed')
+      completed: collaborations.filter((c) => c.status === 'completed')
         .length
     }),
-    []
+    [collaborations]
   );
 
   return (
@@ -1141,7 +1145,7 @@ export const Collaboration = () => {
 
       {/* Modal Ajouter / Gérer mes tâches */}
       {addTaskModal.open && (() => {
-        const currentCollab = allCollaborations.find(c => c.id === addTaskModal.collabId);
+        const currentCollab = collaborations.find(c => c.id === addTaskModal.collabId);
         const allTasks = collabTasks[addTaskModal.collabId] || currentCollab?.tasks || [];
         const myTasks = allTasks.filter(t => t.createdBy === 'me');
         return (
@@ -1353,7 +1357,7 @@ export const Collaboration = () => {
 
       {/* Bottom sheet mobile - Actions sur la carte */}
       {mobileSheet.open && (() => {
-        const c = allCollaborations.find(x => x.id === mobileSheet.collabId);
+        const c = collaborations.find(x => x.id === mobileSheet.collabId);
         if (!c) return null;
         const closed = isCollabClosed(c.id);
         return (
@@ -1469,7 +1473,7 @@ export const Collaboration = () => {
 
       {/* Modal Suggérer des organisations */}
       {suggestOrgModal.open && (() => {
-        const currentCollab = allCollaborations.find(c => c.id === suggestOrgModal.collabId);
+        const currentCollab = collaborations.find(c => c.id === suggestOrgModal.collabId);
         const filteredOrgs = AVAILABLE_ORGS.filter(o =>
           o.name.toLowerCase().includes(suggestSearch.toLowerCase())
         );

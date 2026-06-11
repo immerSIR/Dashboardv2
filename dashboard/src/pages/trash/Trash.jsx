@@ -6,8 +6,112 @@ import {
   Trash, SearchNormal1, ArrowDown2, RotateLeft,
   InfoCircle, CloseCircle, Grid2, HambergerMenu
 } from 'iconsax-react';
-import { getTrashIncidentsService } from '../incident/service/incident_service';
+import { ShimmerThumbnail, ShimmerTitle, ShimmerText } from 'react-shimmer-effects';
+import { getTrashIncidentsService, restoreIncidentService, deleteIncidentService } from '../incident/service/incident_service';
 import './trash.css';
+
+// Composant Shimmer Skeleton pour le chargement des incidents de la corbeille
+const TrashSkeleton = ({ viewMode = 'list' }) => {
+  if (viewMode === 'grid') {
+    return (
+      <div className="trash-grid">
+        {[...Array(6)].map((_, idx) => (
+          <div className="trash-card" key={idx} style={{ opacity: 0.7 }}>
+            <div className="trash-card-thumb">
+              <ShimmerThumbnail height={160} rounded />
+            </div>
+            <div className="trash-card-body" style={{ gap: '12px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <ShimmerThumbnail height={20} width={60} rounded />
+                <ShimmerThumbnail height={20} width={80} rounded />
+              </div>
+              <ShimmerTitle line={1} gap={0} width="60%" />
+              <ShimmerText line={2} gap={8} />
+              <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
+                <ShimmerText line={1} width={100} />
+                <ShimmerText line={1} width={100} />
+              </div>
+            </div>
+            <div className="trash-card-actions">
+              <div style={{ padding: '12px', display: 'flex', justifyContent: 'center' }}>
+                <ShimmerThumbnail height={24} width={80} rounded />
+              </div>
+              <div style={{ padding: '12px', display: 'flex', justifyContent: 'center' }}>
+                <ShimmerThumbnail height={24} width={80} rounded />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="trash-list" style={{ gap: '12px' }}>
+      {[...Array(5)].map((_, idx) => (
+        <div className="trash-row" key={idx} style={{ opacity: 0.7, padding: '16px' }}>
+          <div style={{ width: '16px' }} />
+          <div className="trash-row-thumb">
+            <ShimmerThumbnail height={54} width={72} rounded />
+          </div>
+          <div className="trash-row-main" style={{ gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <ShimmerThumbnail height={16} width={50} rounded />
+              <ShimmerThumbnail height={16} width={70} rounded />
+            </div>
+            <ShimmerTitle line={1} gap={0} width="40%" />
+            <ShimmerText line={1} width="80%" />
+          </div>
+          <div className="trash-row-meta" style={{ gap: '6px', alignItems: 'flex-end' }}>
+            <ShimmerText line={1} width={80} />
+            <ShimmerText line={1} width={100} />
+            <ShimmerText line={1} width={120} />
+          </div>
+          <div style={{ width: '120px', display: 'flex', gap: '8px', paddingLeft: '16px', borderLeft: '1px solid var(--color-border)' }}>
+            <ShimmerThumbnail height={32} width={50} rounded />
+            <ShimmerThumbnail height={32} width={50} rounded />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Fonction d'adaptation des données de l'incident pour la corbeille
+const adaptTrashIncidentData = (incident) => {
+  if (!incident) return null;
+
+  const getBadgeFromEtat = (etat) => {
+    const badges = {
+      'declared': { label: 'DÉCLARÉ', variant: 'declared' },
+      'taken_into_account': { label: 'PRIS EN COMPTE', variant: 'taken' },
+      'resolved': { label: 'RÉSOLU', variant: 'resolved' }
+    };
+    return badges[etat] || { label: 'EN COURS', variant: 'in-progress' };
+  };
+
+  const badge = getBadgeFromEtat(incident.etat);
+
+  // Calcul du nombre de jours restants avant suppression définitive (30 jours max)
+  const createdDate = new Date(incident.created_at || Date.now());
+  const now = new Date();
+  const diffTime = Math.abs(now - createdDate);
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const expiresIn = Math.max(1, 30 - diffDays);
+
+  return {
+    ...incident,
+    title: incident.title || 'Sans titre',
+    description: incident.description || 'Aucune description disponible',
+    image: incident.photo || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&q=80&w=150',
+    type: incident.zone || 'Non spécifié',
+    location: incident.zone || 'Localisation non spécifiée',
+    deletedAt: incident.created_at ? new Date(incident.created_at).toLocaleDateString('fr-FR') : 'Non spécifiée',
+    badgeLabel: badge.label,
+    badgeVariant: badge.variant,
+    expiresIn: expiresIn
+  };
+};
 
 export const TrashPage = () => {
   const {
@@ -26,36 +130,51 @@ export const TrashPage = () => {
     }
   );
 
-  const incidents = incidentsData || [];
+  const incidents = useMemo(() => {
+    const rawList = incidentsData
+      ? Array.isArray(incidentsData)
+        ? incidentsData
+        : Array.isArray(incidentsData.results)
+          ? incidentsData.results
+          : []
+      : [];
+    return rawList.map(adaptTrashIncidentData);
+  }, [incidentsData]);
 
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [toast, setToast] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
+  const [confirmClosing, setConfirmClosing] = useState(false);
   const [selected, setSelected] = useState(new Set());
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'grid'
 
-  const types = useMemo(() => [...new Set(incidents.map((i) => i.type))], [incidents]);
+  const types = useMemo(() => [...new Set(incidents.map((i) => i.type).filter(Boolean))], [incidents]);
 
   const filtered = useMemo(() => {
     return incidents.filter((i) => {
       const matchSearch =
         !search ||
-        i.title.toLowerCase().includes(search.toLowerCase()) ||
-        i.location.toLowerCase().includes(search.toLowerCase());
+        i.title?.toLowerCase().includes(search.toLowerCase()) ||
+        i.location?.toLowerCase().includes(search.toLowerCase());
       const matchType = !typeFilter || i.type === typeFilter;
       return matchSearch && matchType;
     });
   }, [incidents, search, typeFilter]);
 
+  const closeConfirmModal = () => {
+    setConfirmClosing(true);
+    setTimeout(() => {
+      setConfirmId(null);
+      setConfirmClosing(false);
+    }, 280);
+  };
+
   // ── Restaurer un incident ──────────────────────────────
   const handleRestore = async (id) => {
     const item = incidents.find((i) => i.id === id);
     try {
-      // Appeler l'API pour restaurer l'incident (à implémenter)
-      // await restoreIncidentService(id);
-      
-      // Rafraîchir les données
+      await restoreIncidentService(id);
       await mutate();
       setSelected((prev) => { const s = new Set(prev); s.delete(id); return s; });
       showToast(`"${item?.title}" a été restauré.`);
@@ -69,34 +188,28 @@ export const TrashPage = () => {
   const handleDeletePermanent = async (id) => {
     try {
       if (id === 'batch') {
-        // Appeler l'API pour supprimer définitivement les incidents sélectionnés
-        // await Promise.all([...selected].map(id => deleteIncidentPermanentlyService(id)));
-        
+        await Promise.all([...selected].map(selectedId => deleteIncidentService(selectedId)));
         await mutate();
         setSelected(new Set());
         showToast('Incidents sélectionnés supprimés définitivement.');
       } else {
-        // Appeler l'API pour supprimer définitivement un incident
-        // await deleteIncidentPermanentlyService(id);
-        
+        await deleteIncidentService(id);
         await mutate();
         setSelected((prev) => { const s = new Set(prev); s.delete(id); return s; });
         showToast('Incident supprimé définitivement.');
       }
-      setConfirmId(null);
+      closeConfirmModal();
     } catch (error) {
       console.error('Erreur lors de la suppression:', error);
       showToast('Erreur lors de la suppression.');
-      setConfirmId(null);
+      closeConfirmModal();
     }
   };
 
   // ── Restaurer tous les sélectionnés ───────────────────
   const handleRestoreSelected = async () => {
     try {
-      // Appeler l'API pour restaurer les incidents sélectionnés
-      // await Promise.all([...selected].map(id => restoreIncidentService(id)));
-      
+      await Promise.all([...selected].map(selectedId => restoreIncidentService(selectedId)));
       const count = selected.size;
       await mutate();
       showToast(`${count} incident(s) restauré(s).`);
@@ -163,8 +276,8 @@ export const TrashPage = () => {
           </div>
 
           <div className="trash-row-meta">
-            <span className="trash-card-location">📍 {incident.location}</span>
-            <span className="trash-card-date">🗑 {incident.deletedAt}</span>
+            <span className="trash-card-location">{incident.location}</span>
+            <span className="trash-card-date">{incident.deletedAt}</span>
             <div className="trash-card-expiry">
               <span
                 className="trash-expiry-dot"
@@ -182,7 +295,7 @@ export const TrashPage = () => {
               onClick={() => handleRestore(incident.id)}
               title="Restaurer"
             >
-              <RotateLeft size={15} variant="Linear" />
+              <RotateLeft size={15} variant="Linear" color="var(--color-primary)" />
               Restaurer
             </button>
             <button
@@ -190,7 +303,7 @@ export const TrashPage = () => {
               onClick={() => setConfirmId(incident.id)}
               title="Supprimer définitivement"
             >
-              <Trash size={14} variant="Linear" />
+              <Trash size={15} variant="Linear" color="var(--color-danger)" />
               Supprimer
             </button>
           </div>
@@ -244,7 +357,7 @@ export const TrashPage = () => {
             onClick={() => handleRestore(incident.id)}
             title="Restaurer cet incident"
           >
-            <RotateLeft size={16} variant="Linear" />
+            <RotateLeft size={16} variant="Linear" color="var(--color-primary)" />
             Restaurer
           </button>
           <button
@@ -252,7 +365,7 @@ export const TrashPage = () => {
             onClick={() => setConfirmId(incident.id)}
             title="Supprimer définitivement"
           >
-            <Trash size={15} variant="Linear" />
+            <Trash size={15} variant="Linear" color="var(--color-danger)" />
             Supprimer
           </button>
         </div>
@@ -279,17 +392,15 @@ export const TrashPage = () => {
 
           {/* ── État de chargement ── */}
           {isLoading && (
-            <div style={{ padding: '40px', textAlign: 'center' }}>
-              <p>Chargement des incidents supprimés...</p>
-            </div>
+            <TrashSkeleton viewMode={viewMode} />
           )}
 
           {/* ── État d'erreur ── */}
           {incidentsError && (
             <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-danger)' }}>
               <p>Erreur lors du chargement des incidents supprimés.</p>
-              <button 
-                onClick={() => mutate()} 
+              <button
+                onClick={() => mutate()}
                 style={{ marginTop: '12px', padding: '8px 16px', cursor: 'pointer' }}
               >
                 Réessayer
@@ -300,125 +411,125 @@ export const TrashPage = () => {
           {/* ── Contenu principal ── */}
           {!isLoading && !incidentsError && (
             <>
-          {/* ── Header de page ── */}
-          <div className="trash-header">
-            <div className="trash-header-left">
+              {/* ── Header de page ── */}
+              <div className="trash-header">
+                <div className="trash-header-left">
 
-              <div>
-                <h1 className="trash-title">Corbeille</h1>
-                <p className="trash-subtitle">
-                  Les incidents supprimés sont conservés pendant <strong>30 jours</strong> avant d'être définitivement effacés.
-                </p>
+                  <div>
+                    <h1 className="trash-title">Corbeille</h1>
+                    <p className="trash-subtitle">
+                      Les incidents supprimés sont conservés pendant <strong>30 jours</strong> avant d'être définitivement effacés.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="trash-header-right">
+                  {selected.size > 0 && (
+                    <div className="trash-batch-actions" style={{ display: 'flex', gap: 'var(--spacing-2)' }}>
+                      <button className="trash-btn-restore-all" onClick={handleRestoreSelected}>
+                        <RotateLeft size={16} variant="Linear" color="#FFFFFF" />
+                        Restaurer ({selected.size})
+                      </button>
+                      <button className="trash-btn-delete-all" onClick={() => setConfirmId('batch')} style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--spacing-2)', padding: 'var(--spacing-3) var(--spacing-5)', backgroundColor: 'var(--color-danger)', color: 'var(--color-surface)', border: 'none', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-body)', fontWeight: 'var(--font-weight-semibold)', fontFamily: 'var(--font-family)', cursor: 'pointer', transition: 'background-color 0.2s ease, transform 0.1s ease', whiteSpace: 'nowrap' }}>
+                        <Trash size={16} variant="Linear" color="#FFFFFF" />
+                        Supprimer ({selected.size})
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="trash-header-right">
-              {selected.size > 0 && (
-                <div className="trash-batch-actions" style={{ display: 'flex', gap: 'var(--spacing-2)' }}>
-                  <button className="trash-btn-restore-all" onClick={handleRestoreSelected}>
-                    <RotateLeft size={16} variant="Linear" />
-                    Restaurer ({selected.size})
+              {/* ── Bannière info ── */}
+              <div className="trash-info-banner">
+                <InfoCircle size={16} variant="Linear" color="var(--color-primary)" />
+                <span>{incidents.length} incident(s) dans la corbeille. La suppression définitive est irréversible.</span>
+              </div>
+
+              {/* ── Filtres ── */}
+              <div className="trash-filters">
+                <div className="trash-search">
+                  <SearchNormal1 size={16} variant="Linear" color="var(--color-text-muted)" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher un incident..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+
+                <div className="trash-select-wrap">
+                  <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+                    <option value="">Tous les types</option>
+                    {types.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <ArrowDown2 size={14} variant="Linear" color="var(--color-text-muted)" />
+                </div>
+
+                <label className="trash-select-all">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleSelectAll}
+                  />
+                  <span>Tout sélectionner</span>
+                </label>
+
+                {/* Toggle vue intégré sur la même ligne */}
+                <div className="trash-view-toggle" role="group" aria-label="Changer de vue" style={{ marginLeft: 'auto' }}>
+                  <button
+                    className={`trash-view-btn ${viewMode === 'list' ? 'active' : ''}`}
+                    onClick={() => setViewMode('list')}
+                    title="Vue liste"
+                    aria-pressed={viewMode === 'list'}
+                  >
+                    <HambergerMenu
+                      size={18}
+                      variant={viewMode === 'list' ? 'Bold' : 'Linear'}
+                      color={viewMode === 'list' ? 'var(--color-primary)' : 'var(--color-text-muted)'}
+                    />
                   </button>
-                  <button className="trash-btn-delete-all" onClick={() => setConfirmId('batch')} style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--spacing-2)', padding: 'var(--spacing-3) var(--spacing-5)', backgroundColor: 'var(--color-danger)', color: 'var(--color-surface)', border: 'none', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-body)', fontWeight: 'var(--font-weight-semibold)', fontFamily: 'var(--font-family)', cursor: 'pointer', transition: 'background-color 0.2s ease, transform 0.1s ease', whiteSpace: 'nowrap' }}>
-                    <Trash size={16} variant="Linear" />
-                    Supprimer ({selected.size})
+                  <button
+                    className={`trash-view-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                    onClick={() => setViewMode('grid')}
+                    title="Vue grille"
+                    aria-pressed={viewMode === 'grid'}
+                  >
+                    <Grid2
+                      size={18}
+                      variant={viewMode === 'grid' ? 'Bold' : 'Linear'}
+                      color={viewMode === 'grid' ? 'var(--color-primary)' : 'var(--color-text-muted)'}
+                    />
                   </button>
                 </div>
-              )}
-            </div>
-          </div>
 
-          {/* ── Bannière info ── */}
-          <div className="trash-info-banner">
-            <InfoCircle size={16} variant="Linear" color="var(--color-primary)" />
-            <span>{incidents.length} incident(s) dans la corbeille. La suppression définitive est irréversible.</span>
-          </div>
-
-          {/* ── Filtres ── */}
-          <div className="trash-filters">
-            <div className="trash-search">
-              <SearchNormal1 size={16} variant="Linear" color="var(--color-text-muted)" />
-              <input
-                type="text"
-                placeholder="Rechercher un incident..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-
-            <div className="trash-select-wrap">
-              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-                <option value="">Tous les types</option>
-                {types.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-              <ArrowDown2 size={14} variant="Linear" color="var(--color-text-muted)" />
-            </div>
-
-            <label className="trash-select-all">
-              <input
-                type="checkbox"
-                checked={allSelected}
-                onChange={toggleSelectAll}
-              />
-              <span>Tout sélectionner</span>
-            </label>
-
-            {/* Toggle vue intégré sur la même ligne */}
-            <div className="trash-view-toggle" role="group" aria-label="Changer de vue" style={{ marginLeft: 'auto' }}>
-              <button
-                className={`trash-view-btn ${viewMode === 'list' ? 'active' : ''}`}
-                onClick={() => setViewMode('list')}
-                title="Vue liste"
-                aria-pressed={viewMode === 'list'}
-              >
-                <HambergerMenu
-                  size={18}
-                  variant={viewMode === 'list' ? 'Bold' : 'Linear'}
-                  color={viewMode === 'list' ? 'var(--color-primary)' : 'var(--color-text-muted)'}
-                />
-              </button>
-              <button
-                className={`trash-view-btn ${viewMode === 'grid' ? 'active' : ''}`}
-                onClick={() => setViewMode('grid')}
-                title="Vue grille"
-                aria-pressed={viewMode === 'grid'}
-              >
-                <Grid2
-                  size={18}
-                  variant={viewMode === 'grid' ? 'Bold' : 'Linear'}
-                  color={viewMode === 'grid' ? 'var(--color-primary)' : 'var(--color-text-muted)'}
-                />
-              </button>
-            </div>
-
-            <span className="trash-count-label" style={{ marginLeft: 'var(--spacing-2)' }}>
-              {filtered.length} résultat{filtered.length > 1 ? 's' : ''}
-            </span>
-          </div>
-
-          {/* ── Contenu ── */}
-          {filtered.length === 0 ? (
-            <div className="trash-empty">
-              <div className="trash-empty-icon">
-                <Trash size={48} variant="Linear" color="var(--color-border)" />
+                <span className="trash-count-label" style={{ marginLeft: 'var(--spacing-2)' }}>
+                  {filtered.length} résultat{filtered.length > 1 ? 's' : ''}
+                </span>
               </div>
-              <p className="trash-empty-title">La corbeille est vide</p>
-              <p className="trash-empty-sub">Aucun incident supprimé ne correspond à vos critères.</p>
-            </div>
-          ) : viewMode === 'grid' ? (
-            <div className="trash-grid">
-              {filtered.map((incident) => (
-                <IncidentItem key={incident.id} incident={incident} />
-              ))}
-            </div>
-          ) : (
-            <div className="trash-list">
-              {filtered.map((incident) => (
-                <IncidentItem key={incident.id} incident={incident} />
-              ))}
-            </div>
-          )}
-          </>
+
+              {/* ── Contenu ── */}
+              {filtered.length === 0 ? (
+                <div className="trash-empty">
+                  <div className="trash-empty-icon">
+                    <Trash size={48} variant="Linear" color="var(--color-border)" />
+                  </div>
+                  <p className="trash-empty-title">La corbeille est vide</p>
+                  <p className="trash-empty-sub">Aucun incident supprimé ne correspond à vos critères.</p>
+                </div>
+              ) : viewMode === 'grid' ? (
+                <div className="trash-grid">
+                  {filtered.map((incident) => (
+                    <IncidentItem key={incident.id} incident={incident} />
+                  ))}
+                </div>
+              ) : (
+                <div className="trash-list">
+                  {filtered.map((incident) => (
+                    <IncidentItem key={incident.id} incident={incident} />
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
         </main>
@@ -426,34 +537,76 @@ export const TrashPage = () => {
 
       {/* ── Modal confirmation ── */}
       {confirmId && (
-        <div className="trash-modal-overlay" onClick={() => setConfirmId(null)}>
-          <div className="trash-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="trash-modal-close" onClick={() => setConfirmId(null)}>
-              <CloseCircle size={24} variant="Bold" color="var(--color-text-muted)" />
-            </button>
-            <div className="trash-modal-icon">
-              <Trash size={32} variant="Bold" color="var(--color-danger)" />
+        <>
+          <div
+            className={[
+              'am-offcanvas-backdrop',
+              confirmClosing ? 'am-offcanvas-backdrop--closing' : '',
+            ].filter(Boolean).join(' ')}
+            onClick={closeConfirmModal}
+          />
+          <div
+            className={[
+              'am-offcanvas-panel',
+              'am-offcanvas-panel--sm',
+              confirmClosing ? 'am-offcanvas-panel--closing' : '',
+            ].filter(Boolean).join(' ')}
+            role="alertdialog"
+            aria-modal="true"
+            aria-label="Supprimer définitivement"
+          >
+            {/* Header */}
+            <div className="am-offcanvas-header am-offcanvas-header--danger">
+              <h5 className="am-offcanvas-title">Suppression définitive</h5>
+              <button
+                type="button"
+                className="btn-close btn-close-white"
+                onClick={closeConfirmModal}
+                aria-label="Fermer"
+              />
             </div>
-            <h2 className="trash-modal-title">Suppression définitive</h2>
-            <p className="trash-modal-text">
-              Cette action est <strong>irréversible</strong>. {confirmId === 'batch' ? `${selected.size} incident(s) seront` : "L'incident sera"} définitivement supprimé{confirmId === 'batch' ? 's' : ''} et ne pourra{confirmId === 'batch' ? 'nt' : ''} pas être récupéré{confirmId === 'batch' ? 's' : ''}.
-            </p>
-            <div className="trash-modal-actions">
-              <button className="trash-modal-cancel" onClick={() => setConfirmId(null)}>
-                Annuler
-              </button>
-              <button className="trash-modal-confirm" onClick={() => handleDeletePermanent(confirmId)}>
+
+            {/* Body */}
+            <div className="am-offcanvas-body am-offcanvas-body--centered">
+              <div className="am-delete-icon-wrap" aria-hidden="true">
+                <Trash size={32} variant="Bold" color="var(--color-danger)" />
+              </div>
+
+              <p className="am-delete-title">Confirmer la suppression</p>
+              <p className="am-delete-text">
+                Cette action est <strong>irréversible</strong>.<br />
+                {confirmId === 'batch'
+                  ? `Vous êtes sur le point de supprimer définitivement ${selected.size} incident(s) sélectionnés.`
+                  : "Vous êtes sur le point de supprimer définitivement cet incident."
+                } Ils ne pourront pas être récupérés.
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="am-offcanvas-footer am-offcanvas-footer--col">
+              <button
+                type="button"
+                className="am-btn am-btn--danger"
+                onClick={() => handleDeletePermanent(confirmId)}
+              >
                 Supprimer définitivement
+              </button>
+              <button
+                type="button"
+                className="am-btn am-btn--outline"
+                onClick={closeConfirmModal}
+              >
+                Annuler
               </button>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* ── Toast ── */}
       {toast && (
         <div className="trash-toast">
-          <RotateLeft size={16} variant="Linear" />
+          <RotateLeft size={16} variant="Linear" color="#FFFFFF" />
           {toast.message}
         </div>
       )}

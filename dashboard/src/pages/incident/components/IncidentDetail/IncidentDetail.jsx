@@ -9,8 +9,9 @@ import {
   ShimmerCircularImage,
   ShimmerButton
 } from 'react-shimmer-effects';
-import { takeInChargeIncidentService, getIncidentService, getIncidentPredictionService } from '../../service/incident_service';
+import { takeInChargeIncidentService, getIncidentService, getIncidentPredictionService, togglePublicIncidentService } from '../../service/incident_service';
 import { requestCollaborationService } from '../../service/collaboration_service';
+import { getIncidentChatHistoryService, sendIncidentChatMessageService } from '../../service/chat_service';
 import { suggestCollaborationPartnerService } from '../../../collaboration-detail/service/collab_detail_service';
 import {
   ArrowLeft2,
@@ -26,6 +27,7 @@ import {
   Crown1,
   People,
   Eye,
+  EyeSlash,
   Add,
   SearchNormal1,
   Buildings2,
@@ -55,13 +57,13 @@ const IncidentDetailSkeleton = () => (
     {/* Header */}
     <div className="detail-header" style={{ backgroundColor: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)' }}>
       <div className="detail-title-block">
-        <div style={{ width: '40px', height: '40px', borderRadius: '8px', overflow: 'hidden' }}>
+        <div className="detail-back-btn-skeleton" style={{ width: '40px', height: '40px', borderRadius: '8px', overflow: 'hidden' }}>
           <ShimmerThumbnail height={40} width={40} rounded />
         </div>
-        <div style={{ flex: 1, marginLeft: '12px', maxWidth: '300px' }}>
+        <div className="detail-title-skeleton" style={{ flex: 1, marginLeft: '12px', maxWidth: '300px' }}>
           <ShimmerTitle line={1} gap={0} variant="primary" />
         </div>
-        <div style={{ display: 'flex', gap: '8px', marginLeft: '12px' }}>
+        <div className="detail-badges-skeleton" style={{ display: 'flex', gap: '8px', marginLeft: '12px' }}>
           <div style={{ width: '80px', height: '24px', borderRadius: '20px', overflow: 'hidden' }}>
             <ShimmerThumbnail height={24} width={80} rounded />
           </div>
@@ -69,7 +71,7 @@ const IncidentDetailSkeleton = () => (
             <ShimmerThumbnail height={24} width={60} rounded />
           </div>
         </div>
-        <div style={{ marginLeft: 'auto', width: '180px', height: '38px', borderRadius: '8px', overflow: 'hidden' }}>
+        <div className="detail-action-btn-skeleton" style={{ marginLeft: 'auto', width: '180px', height: '38px', borderRadius: '8px', overflow: 'hidden' }}>
           <ShimmerThumbnail height={38} width={180} rounded />
         </div>
       </div>
@@ -162,7 +164,7 @@ const IncidentDetailSkeleton = () => (
         </div>
 
         {/* 3 Pillars shimmer */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '20px' }}>
+        <div className="pillars-grid" style={{ marginBottom: '20px' }}>
           <div className="dark-card" style={{ padding: '16px', height: '220px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <ShimmerTitle line={1} gap={0} />
             <ShimmerText line={3} gap={10} />
@@ -227,13 +229,15 @@ const ORG_ROLE_OPTIONS = ROLE_OPTIONS.filter(role => role.id !== 'leader');
 
 export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
   // Utiliser useSWR pour rafraîchir les données automatiquement
-  const { data: swrIncident, mutate } = useSWR(
+  const { data: swrIncident, mutate, isLoading: isSwrLoading } = useSWR(
     incident?.id ? `/incidents/${incident.id}` : null,
     () => getIncidentService(incident.id),
     {
       fallbackData: incident,
     }
   );
+
+  const isCurrentlyLoading = isLoading || isSwrLoading || (incident?.id && !swrIncident?.title);
 
   // Récupérer la prédiction de l'incident
   const { data: prediction, isLoading: isLoadingPrediction } = useSWR(
@@ -289,11 +293,14 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
 
   const [joinOpen, setJoinOpen] = useState(false);
   const [joinClosing, setJoinClosing] = useState(false);
+  const [joinShowing, setJoinShowing] = useState(false);
   const [motif, setMotif] = useState('');
   const [invitedOrgs, setInvitedOrgs] = useState([]);
   const [orgSearch, setOrgSearch] = useState('');
   const [showOrgDropdown, setShowOrgDropdown] = useState(false);
   const [selfRole, setSelfRole] = useState('contributeur');
+  const [isInvolvePrivate, setIsInvolvePrivate] = useState(false);
+  const [workMode, setWorkMode] = useState('collaboration');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [alertMessage, setAlertMessage] = useState(null);
   const [alertType, setAlertType] = useState('success');
@@ -301,13 +308,61 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
   const [chatMessage, setChatMessage] = useState('');
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [chatError, setChatError] = useState(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const chatMessagesEndRef = useRef(null);
 
   useEffect(() => {
     setImageLoaded(false);
   }, [safeIncident?.image]);
+
   const [messages, setMessages] = useState([
     { id: 1, sender: 'bot', text: 'Bonjour ! Je suis l\'assistant IA Vision. Comment puis-je vous aider avec cet incident ?' }
   ]);
+
+  // SWR pour charger l'historique du chatbot
+  const { data: chatHistory, mutate: mutateChatHistory } = useSWR(
+    chatOpen && safeIncident?.id ? `chat-history-${safeIncident.id}` : null,
+    () => getIncidentChatHistoryService(safeIncident.id),
+    { revalidateOnFocus: false }
+  );
+
+  // Synchroniser l'historique de chat avec le state messages
+  useEffect(() => {
+    if (chatHistory?.history) {
+      const formattedHistory = chatHistory.history.map((msg, index) => ({
+        id: msg.created_at || index,
+        sender: msg.role === 'assistant' ? 'bot' : 'user',
+        text: msg.content
+      }));
+      if (formattedHistory.length > 0) {
+        setMessages(formattedHistory);
+      } else {
+        setMessages([
+          { id: 1, sender: 'bot', text: 'Bonjour ! Je suis l\'assistant IA Vision. Comment puis-je vous aider avec cet incident ?' }
+        ]);
+      }
+    }
+  }, [chatHistory]);
+
+  // Bloquer le scroll du body quand le chatbot est ouvert
+  useEffect(() => {
+    if (chatOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [chatOpen]);
+
+  // Défilement automatique vers le bas lors de la réception d'un nouveau message
+  useEffect(() => {
+    if (chatOpen) {
+      chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, chatOpen, isTyping]);
 
   // Récupérer les organisations avec useSWR uniquement quand le modal est ouvert
   const { data: rawOrganisations, isLoading: isLoadingOrgs } = useSWR(
@@ -333,7 +388,7 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
 
   // Gérer le timeout de 1min30
   useEffect(() => {
-    if (isLoading && incident) {
+    if (isCurrentlyLoading && incident) {
       // Démarrer le timer de 90 secondes
       timeoutRef.current = setTimeout(() => {
         setLoadingTimeout(true);
@@ -352,7 +407,7 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [isLoading, incident]);
+  }, [isCurrentlyLoading, incident]);
 
   // Fonction pour recharger les données
   const handleRefresh = () => {
@@ -360,23 +415,54 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
     mutate();
   };
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!chatMessage.trim()) return;
+    if (!safeIncident?.id) return;
 
-    // Ajouter le message de l'utilisateur
-    const newUserMsg = { id: Date.now(), sender: 'user', text: chatMessage };
-    setMessages(prev => [...prev, newUserMsg]);
+    const userText = chatMessage.trim();
     setChatMessage('');
+    setChatError(null);
 
-    // Simuler une réponse du bot
-    setTimeout(() => {
-      setMessages(prev => [...prev, {
-        id: Date.now(),
-        sender: 'bot',
-        text: 'Je traite votre demande concernant l\'incident...'
-      }]);
-    }, 1000);
+    // Ajouter le message utilisateur localement pour la réactivité
+    const tempUserId = Date.now();
+    setMessages(prev => [...prev, { id: tempUserId, sender: 'user', text: userText }]);
+    setIsTyping(true);
+
+    try {
+      const response = await sendIncidentChatMessageService(safeIncident.id, userText);
+
+      // Mettre à jour l'historique avec la réponse de l'API
+      if (response?.history) {
+        const formattedHistory = response.history.map((msg, index) => ({
+          id: msg.created_at || index,
+          sender: msg.role === 'assistant' ? 'bot' : 'user',
+          text: msg.content
+        }));
+        setMessages(formattedHistory);
+      } else if (response?.message) {
+        setMessages(prev => [...prev, { id: Date.now(), sender: 'bot', text: response.message }]);
+      }
+      mutateChatHistory();
+    } catch (err) {
+      console.error('[Chat] Erreur envoi message:', err);
+      const status = err?.response?.status;
+      let msg = "Une erreur est survenue lors de l'envoi de votre message.";
+      if (status === 400) {
+        msg = "La prédiction de l'incident doit être terminée (avec des résultats) pour pouvoir interagir avec l'assistant.";
+      } else if (status === 404) {
+        msg = "L'incident n'a pas été trouvé.";
+      } else if (status === 502) {
+        msg = "Le service d'intelligence artificielle est temporairement indisponible, mais votre message a bien été enregistré.";
+      } else if (err?.response?.data?.detail) {
+        msg = err.response.data.detail;
+      } else if (err?.response?.data?.message) {
+        msg = err.response.data.message;
+      }
+      setChatError(msg);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const [currentTime, setCurrentTime] = useState(0);
@@ -428,12 +514,35 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
     setDuration(0);
   }, [safeIncident?.id]);
 
+  // Bloquer le scroll du body quand le modal est ouvert
+  useEffect(() => {
+    if (joinOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [joinOpen]);
+
   const openJoinModal = () => {
     setJoinClosing(false);
     setJoinOpen(true);
+    if (safeIncident?.etat === 'declared') {
+      setSelfRole('leader');
+      setWorkMode('collaboration');
+    } else {
+      setSelfRole('contributeur');
+      setWorkMode('collaboration');
+    }
+    setTimeout(() => {
+      setJoinShowing(true);
+    }, 10);
   };
 
   const closeJoinModal = () => {
+    setJoinShowing(false);
     setJoinClosing(true);
     setTimeout(() => {
       setJoinOpen(false);
@@ -443,7 +552,9 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
       setOrgSearch('');
       setShowOrgDropdown(false);
       setSelfRole('contributeur');
-    }, 280);
+      setIsInvolvePrivate(false);
+      setWorkMode('collaboration');
+    }, 300);
   };
 
   const addInvitedOrg = (org) => {
@@ -523,7 +634,8 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
               incident: safeIncident.id,
               suggested_partner: org.id,
               suggested_role: roleStr,
-              justification: commentStr
+              justification: commentStr,
+              user: currentUserId ? parseInt(currentUserId) : null
             });
             console.log('Invitation envoyée:', result);
             successCount++;
@@ -533,14 +645,33 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
 
             // Récupérer le message d'erreur explicite
             let errorMsg = 'Erreur inconnue';
-            if (err.response?.data?.message) {
-              errorMsg = err.response.data.message;
-            } else if (err.response?.data?.error) {
-              errorMsg = err.response.data.error;
-            } else if (err.response?.data?.detail) {
-              errorMsg = err.response.data.detail;
-            } else if (err.message) {
-              errorMsg = err.message;
+            const data = err.response?.data;
+            if (data) {
+              if (data.non_field_errors && Array.isArray(data.non_field_errors)) {
+                const msg = data.non_field_errors[0];
+                errorMsg = msg.includes('unique set')
+                  ? 'Cette organisation a déjà été invitée ou suggérée pour cet incident.'
+                  : msg;
+              } else if (data.detail) {
+                errorMsg = data.detail;
+              } else if (data.message) {
+                errorMsg = data.message;
+              } else if (data.error) {
+                errorMsg = data.error;
+              } else {
+                const keys = Object.keys(data);
+                if (keys.length > 0) {
+                  const val = data[keys[0]];
+                  const msg = Array.isArray(val) ? val[0] : String(val);
+                  errorMsg = msg.includes('unique set')
+                    ? 'Cette organisation a déjà été invitée ou suggérée pour cet incident.'
+                    : msg;
+                } else {
+                  errorMsg = err.message || 'Erreur inconnue';
+                }
+              }
+            } else {
+              errorMsg = err.message || 'Erreur inconnue';
             }
 
             errorMessages.push(errorMsg);
@@ -588,11 +719,23 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
       const incidentEtat = safeIncident?.etat;
       const isNotTakenInCharge = incidentEtat === 'declared';
 
-      if (isNotTakenInCharge) {
-        // Si l'incident n'est pas pris en charge, prendre en charge (devenir leader)
-        const result = await takeInChargeIncidentService(safeIncident.id);
+      if (isNotTakenInCharge && selfRole === 'leader') {
+        // Si l'incident n'est pas pris en charge et que le rôle choisi est leader, prendre en charge (devenir leader)
+        const result = await takeInChargeIncidentService(safeIncident.id, {
+          mode: workMode === 'interne' ? 'internal' : 'collaborative'
+        });
         console.log('Incident pris en charge:', result);
         if (result.status == "success") {
+          // Si l'utilisateur a demandé à s'impliquer en privé ou travailler en interne, on bascule la visibilité en privée
+          if ((isInvolvePrivate || workMode === 'interne') && safeIncident.is_public) {
+            try {
+              await togglePublicIncidentService(safeIncident.id);
+              console.log('Incident basculé en privé avec succès');
+            } catch (err) {
+              console.error('Erreur lors du basculement en privé:', err);
+            }
+          }
+
           setAlertType('success');
           setAlertMessage('Vous êtes maintenant le leader de cet incident !');
 
@@ -609,17 +752,22 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
           setIsSubmitting(false);
         }, 1200);
       } else {
-        // Si l'incident est déjà pris en charge, demander à rejoindre
+        // Si l'incident est déjà pris en charge, OU s'il n'est pas pris en charge mais que l'utilisateur choisit d'être contributeur ou observateur
         const collaborationData = {
           incident: safeIncident.id,
-          role: selfRole === 'contributeur' ? 'contributor' : 'observer',
-          motivation: motif
+          role: selfRole === 'contributeur' ? 'contributor' : selfRole === 'leader' ? 'leader' : 'observer',
+          motivation: motif,
+          user: currentUserId ? parseInt(currentUserId) : null
         };
 
         const result = await requestCollaborationService(collaborationData);
         console.log('Demande de collaboration envoyée:', result);
         setAlertType('success');
-        setAlertMessage('Votre demande a été envoyée au leader de l\'incident !');
+        setAlertMessage(
+          isNotTakenInCharge
+            ? 'Votre demande de collaboration a été envoyée !'
+            : 'Votre demande a été envoyée au leader de l\'incident !'
+        );
 
         // Fermer le modal après 1.2 secondes
         setTimeout(() => {
@@ -645,7 +793,7 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
     }
   };
 
-  if (isLoading) {
+  if (isCurrentlyLoading) {
     // Si le timeout est atteint, afficher le bouton de rechargement
     if (loadingTimeout) {
       return (
@@ -698,16 +846,142 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
     );
   }
 
-  const statusLabels = {
-    'declared': { label: 'Déclaré', color: 'var(--color-danger)' },
-    'taken_into_account': { label: 'Pris en compte', color: 'var(--color-warning)' },
-    'resolved': { label: 'Résolu', color: 'var(--color-success)' },
+  const getStatusBadge = () => {
+    switch (safeIncident.etat) {
+      case 'resolved':
+        return safeIncident.isOwner
+          ? {
+            label: 'Résolu (Moi)',
+            color: 'var(--color-success)',
+            bg: 'rgba(34, 197, 94, 0.12)',
+            border: 'rgba(34, 197, 94, 0.3)',
+            icon: <ShieldTick size={14} variant="Bold" color="var(--color-success)" style={{ marginRight: '6px' }} />
+          }
+          : {
+            label: 'Résolu (Autre)',
+            color: 'var(--color-text-secondary)',
+            bg: 'rgba(107, 114, 128, 0.12)',
+            border: 'rgba(107, 114, 128, 0.3)',
+            icon: <ShieldTick size={14} variant="Bold" color="var(--color-text-secondary)" style={{ marginRight: '6px' }} />
+          };
+      case 'taken_into_account':
+        return safeIncident.isOwner
+          ? {
+            label: 'Pris en compte (Moi)',
+            color: 'var(--color-primary)',
+            bg: 'rgba(58, 162, 221, 0.12)',
+            border: 'rgba(58, 162, 221, 0.3)',
+            icon: <ClipboardTick size={14} variant="Bold" color="var(--color-primary)" style={{ marginRight: '6px' }} />
+          }
+          : {
+            label: 'Pris en compte (Autre)',
+            color: 'var(--color-warning)',
+            bg: 'rgba(249, 115, 22, 0.12)',
+            border: 'rgba(249, 115, 22, 0.3)',
+            icon: <ClipboardTick size={14} variant="Bold" color="var(--color-warning)" style={{ marginRight: '6px' }} />
+          };
+      case 'declared':
+      default:
+        return {
+          label: 'Déclaré',
+          color: 'var(--color-danger)',
+          bg: 'rgba(239, 68, 68, 0.12)',
+          border: 'rgba(239, 68, 68, 0.3)',
+          icon: <Danger size={14} variant="Bold" color="var(--color-danger)" style={{ marginRight: '6px' }} />
+        };
+    }
   };
-  const currentStatus = statusLabels[safeIncident.etat] || statusLabels['declared'];
+
+  const getVisibilityBadge = () => {
+    return safeIncident.is_public
+      ? {
+        label: 'Public',
+        color: 'var(--color-success)',
+        bg: 'rgba(34, 197, 94, 0.12)',
+        border: 'rgba(34, 197, 94, 0.3)',
+        icon: <Eye size={14} variant="Bold" color="var(--color-success)" style={{ marginRight: '6px' }} />
+      }
+      : {
+        label: 'Privé',
+        color: 'var(--color-text-secondary)',
+        bg: 'rgba(107, 114, 128, 0.12)',
+        border: 'rgba(107, 114, 128, 0.3)',
+        icon: <EyeSlash size={14} variant="Bold" color="var(--color-text-secondary)" style={{ marginRight: '6px' }} />
+      };
+  };
+
+  const getModeBadge = () => {
+    if (!safeIncident?.take_in_charge_mode) return null;
+    const isInternal = safeIncident.take_in_charge_mode === 'internal' || safeIncident.take_in_charge_mode === 'interne';
+    return isInternal
+      ? {
+        label: 'Interne',
+        color: 'var(--color-danger)',
+        bg: 'rgba(239, 68, 68, 0.12)',
+        border: 'rgba(239, 68, 68, 0.3)',
+        icon: <Briefcase size={14} variant="Bold" color="var(--color-danger)" style={{ marginRight: '6px' }} />
+      }
+      : {
+        label: 'Collaboratif',
+        color: 'var(--color-primary)',
+        bg: 'rgba(58, 162, 221, 0.12)',
+        border: 'rgba(58, 162, 221, 0.3)',
+        icon: <People size={14} variant="Bold" color="var(--color-primary)" style={{ marginRight: '6px' }} />
+      };
+  };
+
+  const currentStatus = getStatusBadge();
+  const visibilityBadge = getVisibilityBadge();
+  const modeBadge = getModeBadge();
+
+  const getUserRoleBadge = () => {
+    const roleVal = safeIncident?.role || safeIncident?.userRole;
+    if (!roleVal) return null;
+
+    const normalizedRole = roleVal.toLowerCase();
+    if (normalizedRole === 'observer' || normalizedRole === 'observateur') {
+      return {
+        label: 'Observateur',
+        color: 'var(--color-text-secondary)',
+        bg: 'rgba(108, 114, 120, 0.12)',
+        border: 'rgba(108, 114, 120, 0.3)',
+        icon: <Eye size={14} variant="Bold" color="var(--color-text-secondary)" style={{ marginRight: '6px' }} />
+      };
+    }
+    if (normalizedRole === 'contributor' || normalizedRole === 'contributeur') {
+      return {
+        label: 'Contributeur',
+        color: 'var(--color-primary)',
+        bg: 'rgba(58, 162, 221, 0.12)',
+        border: 'rgba(58, 162, 221, 0.3)',
+        icon: <People size={14} variant="Bold" color="var(--color-primary)" style={{ marginRight: '6px' }} />
+      };
+    }
+    if (normalizedRole === 'leader') {
+      return {
+        label: 'Leader',
+        color: 'var(--color-warning)',
+        bg: 'rgba(245, 158, 11, 0.12)',
+        border: 'rgba(245, 158, 11, 0.3)',
+        icon: <Crown1 size={14} variant="Bold" color="var(--color-warning)" style={{ marginRight: '6px' }} />
+      };
+    }
+    return null;
+  };
+
+  const userRoleBadge = getUserRoleBadge();
+  const userRoleVal = safeIncident?.role || safeIncident?.userRole;
+  const hasParticipantRole = userRoleVal && (
+    userRoleVal.toLowerCase() === 'observer' ||
+    userRoleVal.toLowerCase() === 'observateur' ||
+    userRoleVal.toLowerCase() === 'contributor' ||
+    userRoleVal.toLowerCase() === 'contributeur'
+  );
 
   const contextValue = {
     joinOpen,
     joinClosing,
+    joinShowing,
     closeJoinModal,
     safeIncident,
     handleJoinSubmit,
@@ -732,7 +1006,11 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
     updateOrgComment,
     isSubmitting,
     ROLE_OPTIONS,
-    ORG_ROLE_OPTIONS
+    ORG_ROLE_OPTIONS,
+    isInvolvePrivate,
+    setIsInvolvePrivate,
+    workMode,
+    setWorkMode
   };
 
   return (
@@ -752,63 +1030,112 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
             </button>
             <h2 className="detail-title" style={{ color: 'var(--color-text-primary)' }}>{safeIncident.title}</h2>
             {/* Badge statut */}
-            <span style={{
+            <span className="detail-status-badge-custom" style={{
+              display: 'inline-flex',
+              alignItems: 'center',
               padding: '4px 12px',
               borderRadius: '20px',
               fontSize: '12px',
               fontWeight: '600',
-              backgroundColor: `${currentStatus.color}18`,
+              backgroundColor: currentStatus.bg,
               color: currentStatus.color,
-              border: `1px solid ${currentStatus.color}40`,
+              border: `1px solid ${currentStatus.border}`,
               whiteSpace: 'nowrap'
             }}>
+              {currentStatus.icon}
               {currentStatus.label}
             </span>
             {/* Badge public/privé */}
-            <span style={{
+            <span className="detail-visibility-badge-custom" style={{
+              display: 'inline-flex',
+              alignItems: 'center',
               padding: '4px 12px',
               borderRadius: '20px',
               fontSize: '12px',
               fontWeight: '600',
-              backgroundColor: safeIncident.is_public ? 'rgba(34,197,94,0.1)' : 'rgba(107,114,128,0.1)',
-              color: safeIncident.is_public ? 'var(--color-success)' : 'var(--color-text-muted)',
-              border: `1px solid ${safeIncident.is_public ? 'rgba(34,197,94,0.3)' : 'rgba(107,114,128,0.2)'}`,
+              backgroundColor: visibilityBadge.bg,
+              color: visibilityBadge.color,
+              border: `1px solid ${visibilityBadge.border}`,
               whiteSpace: 'nowrap'
             }}>
-              {safeIncident.is_public ? 'Public' : 'Privé'}
+              {visibilityBadge.icon}
+              {visibilityBadge.label}
             </span>
 
-            {/* Bouton Prendre en compte / Inviter */}
-            <button
-              type="button"
-              onClick={openJoinModal}
-              style={{
-                marginLeft: 'auto',
+            {/* Badge mode d'implication (Interne/Collaboratif) */}
+            {modeBadge && (
+              <span className="detail-mode-badge-custom" style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px',
-                padding: '8px 16px',
-                backgroundColor: 'var(--color-primary)',
-                color: 'var(--color-surface)',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '14px',
+                padding: '4px 12px',
+                borderRadius: '20px',
+                fontSize: '12px',
                 fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                whiteSpace: 'nowrap'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2E8BC0'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-primary)'}
-            >
-              <UserAdd size={18} variant="Bold" color="var(--color-surface)" />
-              {safeIncident.isOwner
-                ? 'Inviter des organisations'
-                : safeIncident?.etat === 'declared'
-                  ? 'Prendre en charge'
-                  : "Rejoindre l'action"
-              }
-            </button>
+                backgroundColor: modeBadge.bg,
+                color: modeBadge.color,
+                border: `1px solid ${modeBadge.border}`,
+                whiteSpace: 'nowrap',
+                marginLeft: '8px'
+              }}>
+                {modeBadge.icon}
+                {modeBadge.label}
+              </span>
+            )}
+
+            {/* Badge de rôle utilisateur (Observateur / Contributeur / Leader) */}
+            {userRoleBadge && (
+              <span className="detail-user-role-badge-custom" style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '4px 12px',
+                borderRadius: '20px',
+                fontSize: '12px',
+                fontWeight: '600',
+                backgroundColor: userRoleBadge.bg,
+                color: userRoleBadge.color,
+                border: `1px solid ${userRoleBadge.border}`,
+                whiteSpace: 'nowrap',
+                marginLeft: '8px'
+              }}>
+                {userRoleBadge.icon}
+                {userRoleBadge.label}
+              </span>
+            )}
+
+            {/* Bouton Prendre en compte / Inviter - Masqué si l'incident est géré en interne ou si l'utilisateur a déjà un rôle */}
+            {!(safeIncident?.take_in_charge_mode === 'internal' || safeIncident?.take_in_charge_mode === 'interne') && !hasParticipantRole && (
+              <button
+                type="button"
+                className="detail-action-btn-custom"
+                onClick={openJoinModal}
+                style={{
+                  marginLeft: 'auto',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 16px',
+                  backgroundColor: 'var(--color-primary)',
+                  color: 'var(--color-surface)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  whiteSpace: 'nowrap'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2E8BC0'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-primary)'}
+              >
+                <UserAdd size={18} variant="Bold" color="var(--color-surface)" />
+                {safeIncident.isOwner
+                  ? 'Inviter des organisations'
+                  : safeIncident?.etat === 'declared'
+                    ? "S'impliquer"
+                    : "Rejoindre l'action"
+                }
+              </button>
+            )}
           </div>
           {/* Méta-infos */}
           <div className="detail-meta" style={{ marginTop: '8px' }}>
@@ -977,33 +1304,7 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
               )}
             </div>
 
-            {/* Statut stepper - SUIVI DE L'INCIDENT */}
-            {(() => {
-              const currentIndex = INCIDENT_STATUS_STEPS.findIndex(s => s.id === safeIncident.etat);
-              const validIndex = currentIndex === -1 ? 0 : currentIndex;
-              return (
-                <div className="dark-card" style={{ marginBottom: '20px', padding: '16px' }}>
-                  <div className="dark-card-title">
-                    SUIVI DE L'INCIDENT
-                  </div>
-                  <div className="incident-status-stepper">
-                    <div className="incident-status-bar">
-                      {INCIDENT_STATUS_STEPS.map((step, idx) => (
-                        <div key={step.id} className={`incident-status-segment ${idx < validIndex ? 'is-done' : ''} ${idx === validIndex ? 'is-current' : ''}`} />
-                      ))}
-                    </div>
-                    <div className="incident-status-steps">
-                      {INCIDENT_STATUS_STEPS.map((step, idx) => (
-                        <div key={step.id} className={`incident-status-step ${idx < validIndex ? 'is-done' : ''} ${idx === validIndex ? 'is-current' : ''}`}>
-                          <span className="incident-status-dot" />
-                          <span className="incident-status-label">{step.label.toUpperCase()}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
+
 
             {/* Description */}
             <div className="dark-card" style={{ marginBottom: '20px', padding: '16px' }}>
@@ -1089,40 +1390,39 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
                       </div>
                       <div className="kpi-label">SCORE D'IMPACT GLOBAL</div>
                     </div>
-                    {/* Rayon d'impact */}
-                    <div className="kpi-card" style={{ margin: 0 }}>
-                      <Ruler size={32} variant="Bold" color="var(--color-primary)" />
-                      <div className="kpi-value" style={{ fontSize: '28px', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
-                        {pred.impact_radius_meters}m
-                      </div>
-                      <div className="kpi-label">RAYON D'IMPACT</div>
-                    </div>
-                    {/* Sévérité initiale */}
-                    <div className="kpi-card" style={{ margin: 0 }}>
-                      <Warning2 size={32} variant="Bold" color="var(--color-danger)" />
-                      <div className="kpi-value" style={{ fontSize: '28px', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-danger)' }}>
-                        {pred.base_severity}/10
-                      </div>
-                      <div className="kpi-label">SÉVÉRITÉ INITIALE</div>
-                    </div>
-                    {/* Source visible */}
-                    <div className="kpi-card" style={{ margin: 0 }}>
-                      <Ruler size={32} variant="Bold" color="var(--color-info)" />
-                      <div className="kpi-value" style={{ fontSize: '28px', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-info)' }}>
-                        {pred.source_size_meters}m
-                      </div>
-                      <div className="kpi-label">SOURCE VISIBLE (TAILLE)</div>
-                    </div>
+                    {/* Statut stepper - SUIVI DE L'INCIDENT */}
+                    {(() => {
+                      const currentIndex = INCIDENT_STATUS_STEPS.findIndex(s => s.id === safeIncident.etat);
+                      const validIndex = currentIndex === -1 ? 0 : currentIndex;
+                      return (
+                        <div className="dark-card" style={{ marginBottom: '20px', padding: '16px' }}>
+                          <div className="dark-card-title">
+                            SUIVI DE L'INCIDENT
+                          </div>
+                          <div className="incident-status-stepper">
+                            <div className="incident-status-bar">
+                              {INCIDENT_STATUS_STEPS.map((step, idx) => (
+                                <div key={step.id} className={`incident-status-segment ${idx < validIndex ? 'is-done' : ''} ${idx === validIndex ? 'is-current' : ''}`} />
+                              ))}
+                            </div>
+                            <div className="incident-status-steps">
+                              {INCIDENT_STATUS_STEPS.map((step, idx) => (
+                                <div key={step.id} className={`incident-status-step ${idx < validIndex ? 'is-done' : ''} ${idx === validIndex ? 'is-current' : ''}`}>
+                                  <span className="incident-status-dot" />
+                                  <span className="incident-status-label">{step.label.toUpperCase()}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
-                  <div style={{ fontSize: 'var(--font-size-caption)', color: 'var(--color-text-muted)', marginBottom: 'var(--spacing-4)', lineHeight: '1.4' }}>
-                    <strong>Explication du rayon :</strong> {pred.radius_explanation}
-                  </div>
 
                   {/* ANALYSE IA VISION */}
                   <div className="dark-card" style={{ marginBottom: 'var(--spacing-5)', padding: 'var(--spacing-4)' }}>
                     <div className="dark-card-title" style={{ marginBottom: 'var(--spacing-4)' }}>
-                      <MagicStar size={16} variant="Bold" color="var(--color-primary)" />
                       ANALYSE IA VISION
                     </div>
 
@@ -1137,7 +1437,6 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
                       border: '1px solid var(--color-success)',
                       marginBottom: 'var(--spacing-3)'
                     }}>
-                      <TickCircle size={14} variant="Bold" color="var(--color-success)" />
                       <span style={{ fontSize: 'var(--font-size-caption)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-success)' }}>
                         {pred.status === 'completed' ? 'IA Vision Terminée' : 'IA Vision Engagée'}
                       </span>
@@ -1177,7 +1476,6 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
                         border: '1px solid var(--color-danger)',
                         marginBottom: 'var(--spacing-2)'
                       }}>
-                        <Danger size={12} variant="Bold" color="var(--color-danger)" />
                         <span style={{ fontSize: 'var(--font-size-caption)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-danger)' }}>
                           Motif ({pred.sub_category})
                         </span>
@@ -1225,7 +1523,6 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
                   {(pred.ndvi_heatmap || pred.ndvi_ndwi_plot || pred.landcover_plot) && (
                     <div className="dark-card" style={{ marginBottom: 'var(--spacing-5)', padding: 'var(--spacing-4)' }}>
                       <div className="dark-card-title" style={{ marginBottom: 'var(--spacing-4)' }}>
-                        <MagicStar size={16} variant="Bold" color="var(--color-primary)" />
                         IMAGERIE SPECTRE & COUVERTURE SATELLITE
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 'var(--spacing-3)' }}>
@@ -1256,7 +1553,6 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
                     {/* Pilier Social */}
                     <div className="dark-card" style={{ padding: '16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)', marginBottom: 'var(--spacing-4)' }}>
-                        <People size={16} variant="Bold" color="var(--color-primary)" />
                         <span style={{ fontSize: 'var(--font-size-caption)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                           Pilier Social
                         </span>
@@ -1326,7 +1622,6 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
                     {/* Pilier Environnemental */}
                     <div className="dark-card" style={{ padding: 'var(--spacing-4)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)', marginBottom: 'var(--spacing-4)' }}>
-                        <MagicStar size={16} variant="Bold" color="var(--color-success)" />
                         <span style={{ fontSize: 'var(--font-size-caption)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                           Pilier Environnemental
                         </span>
@@ -1393,7 +1688,6 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
                     {/* Pilier Économique */}
                     <div className="dark-card" style={{ padding: 'var(--spacing-4)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)', marginBottom: 'var(--spacing-4)' }}>
-                        <Buildings2 size={16} variant="Bold" color="var(--color-warning)" />
                         <span style={{ fontSize: 'var(--font-size-caption)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                           Pilier Économique
                         </span>
@@ -1445,7 +1739,6 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
                     marginBottom: 'var(--spacing-5)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-3)' }}>
-                      <Warning2 size={20} variant="Bold" color="var(--color-warning)" style={{ flexShrink: 0, marginTop: '2px' }} />
                       <div>
                         <div style={{ fontSize: 'var(--font-size-body-small)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-warning)', marginBottom: 'var(--spacing-2)' }}>
                           ALERTE PROPAGATION : {pred.potential_risk?.message || `Risque de propagation secondaire par courant d'eau estimé à ≥${pred.impact_radius_meters}m.`}
@@ -1477,7 +1770,6 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
                     marginBottom: 'var(--spacing-5)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-3)' }}>
-                      <TickCircle size={20} variant="Bold" color="var(--color-success)" style={{ flexShrink: 0, marginTop: '2px' }} />
                       <div>
                         <div style={{ fontSize: 'var(--font-size-body-small)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)', marginBottom: 'var(--spacing-2)' }}>
                           {pred.recommendation || pred.piste_solution || `Intervention recommandée dans un rayon de ${pred.impact_radius_meters}m. Score de gravité: ${pred.global_impact_score}/10.`}
@@ -1505,7 +1797,7 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
         </div>
 
         {/* Floating Chatbot Button */}
-        <button className="floating-chatbot" onClick={() => setChatOpen(!chatOpen)}>
+        <button className="floating-chatbot" onClick={() => setChatOpen(!chatOpen)} aria-label="Ouvrir l'assistant de chat">
           {chatOpen ? <CloseCircle size={28} variant="Bold" color="#FFFFFF" /> : <Message size={28} variant="Bold" color="#FFFFFF" />}
         </button>
 
@@ -1514,34 +1806,93 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
           <div className="chatbot-panel">
             <div className="chatbot-header">
               <div className="chatbot-header-title">
-                <MagicStar size={20} variant="Bold" color="#FFF" />
-                Assistant IA Vision
+                Assistant IA Map Action
               </div>
-              <button onClick={() => setChatOpen(false)} style={{ background: 'transparent', border: 'none', color: '#FFF', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                <CloseCircle size={20} variant="Linear" />
+              <button type="button" onClick={() => setChatOpen(false)} style={{ background: 'transparent', border: 'none', color: '#FFFFFF', cursor: 'pointer', display: 'flex', alignItems: 'center' }} aria-label="Fermer l'assistant de chat">
+                <CloseCircle size={20} variant="Linear" color='#ffffff' />
               </button>
             </div>
 
-            <div className="chatbot-messages">
-              {messages.map(msg => (
-                <div key={msg.id} className={`chat-bubble ${msg.sender}`}>
-                  {msg.text}
+            {isLoadingPrediction ? (
+              <div style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'var(--color-surface)'
+              }}>
+                <span className="chatbot-btn-spinner" style={{ width: '24px', height: '24px', border: '3px solid rgba(58, 162, 221, 0.25)', borderTopColor: 'var(--color-primary)' }} />
+              </div>
+            ) : !pred ? (
+              <div style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '24px',
+                textAlign: 'center',
+                color: 'var(--color-text-secondary)',
+                backgroundColor: 'var(--color-surface)'
+              }}>
+                <Warning2 size={48} variant="Bold" color="var(--color-warning)" style={{ marginBottom: '16px' }} />
+                <h4 style={{ fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+                  Chat indisponible
+                </h4>
+                <p style={{ fontSize: '13px', lineHeight: '1.6' }}>
+                  Le chat n'est pas disponible pour cet incident car aucune prédiction/analyse n'a encore été générée.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="chatbot-messages">
+                  {messages.map((msg, idx) => (
+                    <div key={msg.id || idx} className={`chat-bubble ${msg.sender}`}>
+                      {msg.text}
+                    </div>
+                  ))}
+                  {isTyping && (
+                    <div className="chatbot-typing">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
+                  )}
+                  <div ref={chatMessagesEndRef} />
                 </div>
-              ))}
-            </div>
 
-            <form className="chatbot-input-area" onSubmit={handleSendMessage}>
-              <input
-                type="text"
-                className="chatbot-input"
-                placeholder="Posez votre question..."
-                value={chatMessage}
-                onChange={(e) => setChatMessage(e.target.value)}
-              />
-              <button type="submit" className="chatbot-send-btn">
-                <Send2 size={18} variant="Bold" />
-              </button>
-            </form>
+                {chatError && (
+                  <div className="chatbot-error-message">
+                    <CloseCircle size={16} variant="Bold" color="#EF4444" />
+                    <span>{chatError}</span>
+                  </div>
+                )}
+
+                <form className="chatbot-input-area" onSubmit={handleSendMessage}>
+                  <textarea
+                    className="chatbot-input"
+                    placeholder="Posez votre question..."
+                    value={chatMessage}
+                    onChange={(e) => setChatMessage(e.target.value)}
+                    disabled={isTyping}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage(e);
+                      }
+                    }}
+                    rows={2}
+                  />
+                  <button type="submit" className="chatbot-send-btn" disabled={isTyping || !chatMessage.trim()}>
+                    {isTyping ? (
+                      <span className="chatbot-btn-spinner" />
+                    ) : (
+                      <Send2 size={18} variant="Bold" color='#ffffff' />
+                    )}
+                  </button>
+                </form>
+              </>
+            )}
           </div>
         )}
 

@@ -207,7 +207,7 @@ export const authService = {
 
       console.log('[AUTH] Changement de mot de passe');
       const response = await axios.post(
-        `${API_URL}/MapApi/change-password/`,
+        `${API_URL}/MapApi/change_password/`,
         { old_password, new_password },
         {
           headers: {

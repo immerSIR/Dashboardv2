@@ -11,7 +11,7 @@ export const getCollaborationsService = async () => {
   try {
     const axios = authService.createAuthenticatedAxios();
     const response = await axios.get(`${API_URL_BASE}/MapApi/${COLLABORATION_URL}/`);
-    
+
     console.log('[Collaboration] Collaborations récupérées:', response.data);
     return response?.data?.results || response?.data || [];
   } catch (error) {
@@ -29,7 +29,7 @@ export const getCollaborationService = async (id) => {
   try {
     const axios = authService.createAuthenticatedAxios();
     const response = await axios.get(`${API_URL_BASE}/MapApi/${COLLABORATION_URL}/${id}/`);
-    
+
     console.log('[Collaboration] Collaboration récupérée:', response.data);
     return response.data;
   } catch (error) {
@@ -53,7 +53,7 @@ export const createCollaborationService = async (collaborationData) => {
       `${API_URL_BASE}/MapApi/${COLLABORATION_URL}/`,
       collaborationData
     );
-    
+
     console.log('[Collaboration] Collaboration créée:', response.data);
     return response.data;
   } catch (error) {
@@ -73,7 +73,7 @@ export const acceptCollaborationService = async (id) => {
     const response = await axios.post(
       `${API_URL_BASE}/MapApi/${COLLABORATION_URL}/${id}/accept/`
     );
-    
+
     console.log('[Collaboration] Collaboration acceptée:', response.data);
     return response.data;
   } catch (error) {
@@ -93,7 +93,7 @@ export const rejectCollaborationService = async (id) => {
     const response = await axios.post(
       `${API_URL_BASE}/MapApi/${COLLABORATION_URL}/${id}/reject/`
     );
-    
+
     console.log('[Collaboration] Collaboration rejetée:', response.data);
     return response.data;
   } catch (error) {
@@ -134,7 +134,7 @@ export const getOrganisationMembersService = async (orgId) => {
  * @param {string} memberData.org_role - Rôle (org_admin|bureau_agent|field_agent, requis)
  * @returns {Promise<Object>} Membre ajouté
  */
-export const addOrganisationMemberService = async (orgId, memberData) => {
+export const addOrganisationStaffMemberService = async (orgId, memberData) => {
   try {
     const axios = authService.createAuthenticatedAxios();
     const response = await axios.post(
@@ -456,7 +456,7 @@ export default {
   groupCollaborationsByIncident,
   // Organisation - Membres
   getOrganisationMembersService,
-  addOrganisationMemberService,
+  addOrganisationStaffMemberService,
   updateOrganisationMemberService,
   removeOrganisationMemberService,
   // Rapports de terrain

@@ -24,7 +24,25 @@ export const getOrganisationsService = async () => {
 export const createOrganisationService = async (data) => {
   try {
     const axios = authService.createAuthenticatedAxios();
-    const response = await axios.post(`${API_URL_BASE}/MapApi/organisations/`, data);
+    const formData = new FormData();
+    
+    Object.keys(data).forEach((key) => {
+      if (data[key] === null) {
+        formData.append(key, '');
+      } else if (data[key] !== undefined) {
+        formData.append(key, data[key]);
+      }
+    });
+
+    const response = await axios.post(
+      `${API_URL_BASE}/MapApi/organisations/`, 
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
 
     console.log('[Organisation] Organisations creer:', response.data);
     return response?.data?.results || response?.data || [];
@@ -46,7 +64,7 @@ export const deleteOrganisationService = async (id) => {
     console.log('[Organisation] Organisations supprimer:', response.data);
     return response?.data?.results || response?.data || [];
   } catch (error) {
-    console.error('[Organisation] Erreur creer organisations:', error?.response?.status, error?.response?.data);
+    console.error('[Organisation] Erreur supprimer organisations:', error?.response?.status, error?.response?.data);
     throw error;
   }
 };
@@ -58,12 +76,30 @@ export const deleteOrganisationService = async (id) => {
 export const updateOrganisationService = async (id, data) => {
   try {
     const axios = authService.createAuthenticatedAxios();
-    const response = await axios.put(`${API_URL_BASE}/MapApi/organisations/${id}/`, data);
+    const formData = new FormData();
+    
+    Object.keys(data).forEach((key) => {
+      if (data[key] === null) {
+        formData.append(key, '');
+      } else if (data[key] !== undefined) {
+        formData.append(key, data[key]);
+      }
+    });
+
+    const response = await axios.put(
+      `${API_URL_BASE}/MapApi/organisations/${id}/`, 
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
 
     console.log('[Organisation] Organisations modifier:', response.data);
     return response?.data?.results || response?.data || [];
   } catch (error) {
-    console.error('[Organisation] Erreur creer organisations:', error?.response?.status, error?.response?.data);
+    console.error('[Organisation] Erreur modifier organisations:', error?.response?.status, error?.response?.data);
     throw error;
   }
 };

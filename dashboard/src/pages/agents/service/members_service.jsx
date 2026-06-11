@@ -19,7 +19,7 @@ export const getOrganisationMembersService = async (organisationId) => {
 };
 
 /**
- * Crée un nouvel agent dans une organisation
+ * Crée un nouvel agent de terrain dans une organisation
  * @param {number|string} organisationId - ID de l'organisation
  * @param {Object} agentData - Données de l'agent à créer
  * @returns {Promise<Object>} Agent créé
@@ -28,7 +28,7 @@ export const createOrganisationAgentService = async (organisationId, agentData) 
     try {
         const axios = authService.createAuthenticatedAxios();
         const response = await axios.post(
-            `${API_URL_BASE}/MapApi/organisations/${organisationId}/members/create-agent/`,
+            `${API_URL_BASE}/MapApi/organisations/${organisationId}/agents/create/`,
             agentData,
             { headers: { 'Content-Type': 'application/json' } }
         );
@@ -46,18 +46,18 @@ export const createOrganisationAgentService = async (organisationId, agentData) 
  * @param {Object} data - Données { user_id, org_role }
  * @returns {Promise<Object>}
  */
-export const addOrganisationMemberService = async (organisationId, data) => {
+export const addOrganisationStaffMemberService = async (organisationId, data) => {
     try {
         const axios = authService.createAuthenticatedAxios();
         const response = await axios.post(
-            `${API_URL_BASE}/MapApi/organisations/${organisationId}/members/add/`,
+            `${API_URL_BASE}/MapApi/organisations/${organisationId}/staff/create/`,
             data,
             { headers: { 'Content-Type': 'application/json' } }
         );
-        console.log('[Members] Membre ajouté:', response.data);
+        console.log('[Members] Staff ajouté:', response.data);
         return response.data;
     } catch (error) {
-        console.error('[Members] Erreur ajout membre:', error?.response?.status, error?.response?.data);
+        console.error('[Members] Erreur ajout staff:', error?.response?.status, error?.response?.data);
         throw error;
     }
 };

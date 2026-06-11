@@ -17,6 +17,7 @@ export const TaskModal = () => {
     collaboration,
     showTaskModal,
     taskModalClosing,
+    taskModalShowing,
     closeTaskModal,
     draftTasks,
     setDraftTasks,
@@ -48,7 +49,9 @@ export const TaskModal = () => {
     startEditTask,
     cancelEditTask,
     saveEditTask,
-    deleteTask
+    deleteTask,
+    taskToDelete,
+    setTaskToDelete
   } = useCollaborationDetail();
 
   const getTodayLocalStr = () => {
@@ -74,45 +77,43 @@ export const TaskModal = () => {
 
   if (!showTaskModal) return null;
 
-  // Empêche la fermeture accidentelle lors du clic dans le corps du modal
-  const handleOverlayClick = (e) => {
-    if (e.target === e.currentTarget) {
-      closeTaskModal();
-    }
-  };
+  const panelClass = [
+    'am-offcanvas-panel',
+    taskModalClosing ? 'am-offcanvas-panel--closing' : '',
+    taskModalShowing && !taskModalClosing ? 'am-offcanvas-panel--opening' : '',
+  ].filter(Boolean).join(' ');
+
+  const backdropClass = [
+    'am-offcanvas-backdrop',
+    taskModalClosing ? 'am-offcanvas-backdrop--closing' : '',
+  ].filter(Boolean).join(' ');
 
   return (
-    <div
-      className={`tasks-modal-overlay ${taskModalClosing ? 'closing' : ''}`}
-      onClick={handleOverlayClick}
-    >
-      <aside
-        className={`tasks-modal ${taskModalClosing ? 'closing' : ''}`}
-        onClick={(e) => e.stopPropagation()}
+    <>
+      <div className={backdropClass} onClick={closeTaskModal} />
+      <div
+        className={panelClass}
         role="dialog"
         aria-modal="true"
+        aria-label="Gérer mes tâches"
       >
-        <header className="tasks-modal-header">
-          <div>
-            <h3 className="tasks-modal-title">Gérer mes tâches</h3>
-            <p className="tasks-modal-subtitle">
-              {collaboration?.title}
-            </p>
+        <div className="am-offcanvas-header">
+          <div className="d-flex flex-column" style={{ minWidth: 0, flex: 1 }}>
+            <h5 className="am-offcanvas-title">Gérer mes tâches</h5>
+            <small style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>{collaboration?.title}</small>
           </div>
           <button
             type="button"
-            className="tasks-modal-close"
+            className="btn-close"
             onClick={closeTaskModal}
-            aria-label="Fermer le modal"
-          >
-            <CloseSquare size={24} variant="Linear" color="#1A1C1E" />
-          </button>
-        </header>
+            aria-label="Fermer"
+          />
+        </div>
 
-        <div className="tasks-modal-body">
+        <div className="am-offcanvas-body">
           {taskSubmitAlert && (
-            <div className={`alert alert-${taskSubmitAlert.type} d-flex align-items-center`} role="alert" style={{ marginBottom: 'var(--spacing-4)', padding: 'var(--spacing-3)', borderRadius: 'var(--radius-md)' }}>
-              <div style={{ flex: 1, fontWeight: 'var(--font-weight-semibold)' }}>{taskSubmitAlert.message}</div>
+            <div className={`am-alert am-alert--${taskSubmitAlert.type === 'success' ? 'success' : 'danger'}`} role="alert" style={{ marginBottom: 'var(--spacing-4)' }}>
+              <span className="am-alert__message">{taskSubmitAlert.message}</span>
             </div>
           )}
 
@@ -148,8 +149,8 @@ export const TaskModal = () => {
               disabled={taskSubmitSaving}
             />
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-3)' }}>
-              <div>
+            <div  className='d-flex justify-content-between flex-wrap gap-2'>
+              <div className='w-100'>
                 <label className="tasks-add-label">
                   Date de début (optionnel)
                 </label>
@@ -162,7 +163,7 @@ export const TaskModal = () => {
                   min={todayString}
                 />
               </div>
-              <div>
+              <div className='w-100'>
                 <label className="tasks-add-label">
                   Date de fin (optionnel)
                 </label>
@@ -360,21 +361,22 @@ export const TaskModal = () => {
                             )}
                           </div>
                         </div>
-                        {!task.completed && !task.failed && (
                           <div className="my-task-actions">
-                            <button
-                              type="button"
-                              className="my-task-action-btn edit"
-                              onClick={() => startEditTask(task)}
-                              title="Modifier"
-                              disabled={deletingTaskIds.includes(task.id)}
-                            >
-                              <Edit2 size={16} variant="Linear" color="#3AA2DD" />
-                            </button>
+                            {!task.completed && !task.failed && (
+                              <button
+                                type="button"
+                                className="my-task-action-btn edit"
+                                onClick={() => startEditTask(task)}
+                                title="Modifier"
+                                disabled={deletingTaskIds.includes(task.id)}
+                              >
+                                <Edit2 size={16} variant="Linear" color="#3AA2DD" />
+                              </button>
+                            )}
                             <button
                               type="button"
                               className="my-task-action-btn delete"
-                              onClick={() => deleteTask(task.id)}
+                              onClick={() => setTaskToDelete(task)}
                               title="Supprimer"
                               disabled={deletingTaskIds.includes(task.id)}
                               style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
@@ -386,49 +388,45 @@ export const TaskModal = () => {
                               )}
                             </button>
                           </div>
-                        )}
                       </>
                     )}
                   </div>
                 ))}
               </div>
             )}
-          </div>
+            </div>
         </div>
 
-        <footer className="tasks-modal-footer">
-          <div className="tasks-footer-actions">
-            <button
-              type="button"
-              className="tasks-footer-close-btn"
-              onClick={closeTaskModal}
-              disabled={taskSubmitSaving}
-            >
-              <CloseSquare size={16} variant="Linear" color="currentColor" />
-              Annuler
-            </button>
-            <button
-              type="button"
-              className="tasks-close-collab-btn"
-              onClick={submitNewTask}
-              disabled={draftTasks.length === 0 || taskSubmitSaving}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-            >
-              {taskSubmitSaving ? (
-                <>
-                  <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" style={{ width: '12px', height: '12px', border: '2px solid transparent', borderTopColor: '#ffffff', borderRightColor: '#ffffff', borderRadius: '50%', animation: 'spin 0.75s linear infinite', marginRight: '4px' }}></span>
-                  <span>Confirmation...</span>
-                </>
-              ) : (
-                <>
-                  <TickCircle size={16} variant="Bold" color="#FFFFFF" />
-                  Confirmer
-                </>
-              )}
-            </button>
-          </div>
-        </footer>
-      </aside>
-    </div>
+        <div className="am-offcanvas-footer">
+          <button
+            type="button"
+            className="am-btn am-btn--secondary"
+            onClick={closeTaskModal}
+            disabled={taskSubmitSaving}
+          >
+            <CloseSquare size={16} variant="Linear" color="currentColor" className="me-2" />
+            Annuler
+          </button>
+          <button
+            type="button"
+            className="am-btn am-btn--primary"
+            onClick={submitNewTask}
+            disabled={draftTasks.length === 0 || taskSubmitSaving}
+          >
+            {taskSubmitSaving ? (
+              <>
+                <span className="am-spinner" aria-hidden="true" />
+                Confirmation...
+              </>
+            ) : (
+              <>
+                <TickCircle size={16} variant="Bold" color="#FFFFFF" className="me-2" />
+                Confirmer
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </>
   );
 };

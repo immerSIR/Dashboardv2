@@ -10,6 +10,7 @@ import { Profile } from './pages/profile';
 import { TrashPage } from './pages/trash';
 import { Organisations } from './pages/organisations';
 import { Agents } from './pages/agents';
+import { ImplicationPrivee } from './pages/implication-privee';
 import { ProtectedRoute } from './components/auth';
 import { authService } from './pages/auth/services/authService';
 
@@ -80,6 +81,14 @@ function App() {
           element={
             <ProtectedRoute>
               <IncidentDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/implication-privee"
+          element={
+            <ProtectedRoute>
+              <ImplicationPrivee />
             </ProtectedRoute>
           }
         />

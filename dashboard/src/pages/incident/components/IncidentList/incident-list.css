@@ -145,6 +145,21 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* Scrollbar personnalisée premium */
+.incident-table-wrap::-webkit-scrollbar {
+  height: 6px;
+}
+.incident-table-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+.incident-table-wrap::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+}
+.incident-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
 .incident-table {
   width: 100%;
   min-width: 800px;
@@ -170,6 +185,25 @@
   vertical-align: middle;
 }
 
+/* Fixer la première colonne (Incident) */
+.incident-table th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background-color: var(--color-background);
+  border-right: 1px solid var(--color-border);
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.03);
+}
+
+.incident-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background-color: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.03);
+}
+
 .incident-table tr:last-child td {
   border-bottom: none;
 }
@@ -183,8 +217,20 @@
   background-color: rgba(58, 162, 221, 0.03);
 }
 
+.incident-table tbody tr:hover td:first-child {
+  background-color: #F8FAFC;
+}
+
 .incident-table tbody tr.is-selected {
   background-color: rgba(58, 162, 221, 0.08);
+}
+
+.incident-table tbody tr.is-selected td:first-child {
+  background-color: #EFF6FF;
+}
+
+.incident-table tbody tr:active td:first-child {
+  background-color: #F1F5F9;
 }
 
 /* Main Column: Image + Text */
@@ -351,6 +397,38 @@
 
 .incident-icon-btn-view:hover {
   background-color: rgba(58, 162, 221, 0.2);
+}
+
+/* Incident List Actions Table Buttons */
+.incident-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.incident-action-btn.assign-btn {
+  color: var(--color-primary);
+  background-color: rgba(58, 162, 221, 0.1);
+}
+
+.incident-action-btn.assign-btn:hover {
+  background-color: rgba(58, 162, 221, 0.2);
+}
+
+.incident-action-btn.delete-btn {
+  color: var(--color-danger);
+  background-color: rgba(239, 68, 68, 0.08);
+}
+
+.incident-action-btn.delete-btn:hover {
+  background-color: rgba(239, 68, 68, 0.18);
 }
 
 /* ============================================

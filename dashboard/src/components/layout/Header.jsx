@@ -162,13 +162,22 @@ export const Header = ({ onMenuToggle, user }) => {
               onClick={() => setShowProfileMenu(!showProfileMenu)}
               aria-label="Menu profil"
             >
-              <div style={{color:"white",fontWeight: "bold"}}>
-                {currentUser?.first_name.charAt(0).toUpperCase()}
-              </div>
-              
-              <div className="header-profile-fallback" >
-                <User size={18} variant="Bold" style={{fill:"white"}} />
-              </div>
+              {currentUser?.logo || currentUser?.logo_url ? (
+                <img
+                  src={currentUser.logo || currentUser.logo_url}
+                  alt="Logo"
+                />
+              ) : (
+                <>
+                  <div style={{color:"white",fontWeight: "bold"}}>
+                    {currentUser?.first_name?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                  
+                  <div className="header-profile-fallback" >
+                    <User size={18} variant="Bold" style={{fill:"white"}} />
+                  </div>
+                </>
+              )}
             </button>
 
             {showProfileMenu && (

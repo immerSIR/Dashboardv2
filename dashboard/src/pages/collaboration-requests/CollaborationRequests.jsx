@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { useSidebarState } from '../../hooks/useSidebarState';
 import {
@@ -18,13 +18,20 @@ import {
   UserAdd,
   Send2,
   Import,
-  Export
+  Export,
+  InfoCircle
 } from 'iconsax-react';
 import { Header, Sidebar } from '../../components/layout';
-import { collaborationRequests as allRequests } from './data/requests';
 import {
   listPartnerSuggestionsService,
-  getPartnerSuggestionService
+  getPartnerSuggestionService,
+  getMyPendingReceivedSuggestionsService,
+  acceptPartnerSuggestionService,
+  rejectPartnerSuggestionService,
+  listCollaborationsService,
+  getCollaborationDashboardService,
+  acceptCollaborationService,
+  rejectCollaborationService
 } from './service/partner_service';
 import './collaboration-requests.css';
 
@@ -36,12 +43,18 @@ const STATUS_META = {
     className: 'status-pending'
   },
   accepted: {
-    label: 'Acceptée',
+    label: 'Active',
     icon: TickCircle,
     color: '#22C55E',
     className: 'status-accepted'
   },
   rejected: {
+    label: 'Refusée',
+    icon: CloseCircle,
+    color: '#EF4444',
+    className: 'status-rejected'
+  },
+  declined: {
     label: 'Refusée',
     icon: CloseCircle,
     color: '#EF4444',
@@ -52,7 +65,9 @@ const STATUS_META = {
 const ROLE_META = {
   leader: { label: 'Leader', icon: Crown1, color: '#F59E0B' },
   contributeur: { label: 'Contributeur', icon: People, color: '#3AA2DD' },
-  observateur: { label: 'Observateur', icon: Eye, color: '#6C7278' }
+  observateur: { label: 'Observateur', icon: Eye, color: '#6C7278' },
+  contributor: { label: 'Contributeur', icon: People, color: '#3AA2DD' },
+  observer: { label: 'Observateur', icon: Eye, color: '#6C7278' }
 };
 
 const formatDate = (iso) => {
@@ -65,6 +80,13 @@ const formatDate = (iso) => {
   });
 };
 
+const getInitials = (name = '') =>
+  name
+    .split(' ')
+    .slice(0, 2)
+    .map((n) => n[0]?.toUpperCase() || '')
+    .join('');
+
 export const CollaborationRequests = ({
   embedded = false
 }) => {
@@ -75,45 +97,59 @@ export const CollaborationRequests = ({
     setCollapsed: setSidebarCollapsed,
   } = useSidebarState();
 
-  // Si embedded, on ne gère pas le layout complet
-
-  const [requests, setRequests] = useState(allRequests);
+  const [localRequests, setLocalRequests] = useState([]);
+  const [showInfoBanner, setShowInfoBanner] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  // 'all' | 'app-sent' | 'app-received' | 'sug-sent' | 'sug-received'
   const [typeFilter, setTypeFilter] = useState('all');
-  const [expanded, setExpanded] = useState(null);
+  const [expandedIncident, setExpandedIncident] = useState(null);
 
-  // Modal de décision (un seul, avec choix interne)
+  // Modal de décision
   const [decisionRequest, setDecisionRequest] = useState(null);
   const [decisionAction, setDecisionAction] = useState(null); // 'accept' | 'reject' | null
   const [decisionClosing, setDecisionClosing] = useState(false);
   const [responseText, setResponseText] = useState('');
   const [suggestionsStatus, setSuggestionsStatus] = useState({}); // {orgName: 'accepted' | 'rejected'}
+  const [isSubmittingDecision, setIsSubmittingDecision] = useState(false);
+  const [decisionError, setDecisionError] = useState(null);
 
-  // Clé SWR pour la suggestion sélectionnée [incidentId, suggestionId]
+  // Clé SWR pour la suggestion sélectionnée
   const [selectedSuggestionKey, setSelectedSuggestionKey] = useState(null);
 
-  // ── SWR : liste des suggestions de partenaires ──────────────────────────
-  // listPartnerSuggestionsService attend un incidentId précis.
-  // On garde la clé null par défaut (désactivé) — à passer un incidentId
-  // spécifique si tu veux charger les suggestions d'un incident en particulier.
-  const {
-    data: apiSuggestions,
-    isLoading: isLoadingSuggestions,
-    error: suggestionsError,
-    mutate: mutateSuggestions
-  } = useSWR(
-    null, // remplacer par ['partner-suggestions', incidentId] pour activer
-    null,
+  // SWR Calls
+  const { data: pendingSuggestions, mutate: mutatePendingSuggestions } = useSWR(
+    typeFilter === 'sug-received' || typeFilter === 'all' ? 'my-pending-received-suggestions' : null,
+    getMyPendingReceivedSuggestionsService,
     { revalidateOnFocus: false }
   );
 
-  // ── SWR conditionnel : détail d'une suggestion sélectionnée ────────────
-  const {
-    data: selectedSuggestionDetail,
-    isLoading: isLoadingDetail
-  } = useSWR(
+  const { data: activeCollabs, mutate: mutateActiveCollabs } = useSWR(
+    typeFilter === 'app-sent' || typeFilter === 'all' ? ['my-active-collaborations', { status: 'in-progress' }] : null,
+    ([, params]) => getCollaborationDashboardService(params),
+    { revalidateOnFocus: false }
+  );
+
+  const { data: pendingInvitations, mutate: mutatePendingInvitations } = useSWR(
+    typeFilter === 'app-received' || typeFilter === 'all' ? ['my-pending-contributor-invitations', { status: 'pending', role: 'contributor' }] : null,
+    ([, params]) => listCollaborationsService(params),
+    { revalidateOnFocus: false }
+  );
+
+  useEffect(() => {
+    if (typeFilter === 'all') {
+      mutatePendingSuggestions();
+      mutateActiveCollabs();
+      mutatePendingInvitations();
+    } else if (typeFilter === 'app-sent') {
+      mutateActiveCollabs();
+    } else if (typeFilter === 'app-received') {
+      mutatePendingInvitations();
+    } else if (typeFilter === 'sug-received') {
+      mutatePendingSuggestions();
+    }
+  }, [typeFilter, mutatePendingSuggestions, mutateActiveCollabs, mutatePendingInvitations]);
+
+  const { data: selectedSuggestionDetail } = useSWR(
     selectedSuggestionKey
       ? `partner-suggestion-${selectedSuggestionKey[0]}-${selectedSuggestionKey[1]}`
       : null,
@@ -123,16 +159,15 @@ export const CollaborationRequests = ({
     { revalidateOnFocus: false }
   );
 
-
   const openDecision = (request) => {
     setDecisionRequest(request);
     setDecisionAction(null);
     setResponseText('');
     setDecisionClosing(false);
     setSuggestionsStatus({});
-    // Charger le détail de la suggestion via API si elle a un incidentId
-    if (request?.incidentId && request?.id) {
-      setSelectedSuggestionKey([request.incidentId, request.id]);
+    setDecisionError(null);
+    if (request?.incidentId && (request?.apiId || request?.id)) {
+      setSelectedSuggestionKey([request.incidentId, request.apiId || request.id]);
     } else {
       setSelectedSuggestionKey(null);
     }
@@ -146,78 +181,250 @@ export const CollaborationRequests = ({
       setDecisionClosing(false);
       setResponseText('');
       setSuggestionsStatus({});
+      setDecisionError(null);
     }, 280);
   };
 
-  const handleConfirmDecision = (e) => {
+  const handleConfirmDecision = async (e) => {
     e.preventDefault();
     if (!decisionRequest || !decisionAction) return;
+    setIsSubmittingDecision(true);
+    setDecisionError(null);
+
     const newStatus = decisionAction === 'accept' ? 'accepted' : 'rejected';
-    setRequests((prev) =>
-      prev.map((r) =>
-        r.id === decisionRequest.id
-          ? {
-            ...r,
-            status: newStatus,
-            respondedAt: new Date().toISOString(),
-            response: responseText.trim() || null
-          }
-          : r
-      )
-    );
-    closeDecision();
+
+    try {
+      if (typeof decisionRequest.id === 'string' && decisionRequest.id.startsWith('sug_received_')) {
+        const suggestionId = decisionRequest.apiId;
+        const incidentId = decisionRequest.incidentId;
+
+        if (decisionAction === 'accept') {
+          await acceptPartnerSuggestionService(incidentId, suggestionId);
+        } else {
+          await rejectPartnerSuggestionService(incidentId, suggestionId);
+        }
+        mutatePendingSuggestions();
+      } else if (typeof decisionRequest.id === 'string' && decisionRequest.id.startsWith('invitation_pending_')) {
+        const collaborationId = decisionRequest.apiId;
+
+        if (decisionAction === 'accept') {
+          await acceptCollaborationService(collaborationId);
+        } else {
+          await rejectCollaborationService(collaborationId);
+        }
+        mutatePendingInvitations();
+      } else {
+        setLocalRequests((prev) =>
+          prev.map((r) =>
+            r.id === decisionRequest.id
+              ? {
+                ...r,
+                status: newStatus,
+                respondedAt: new Date().toISOString(),
+                response: responseText.trim() || null
+              }
+              : r
+          )
+        );
+      }
+      closeDecision();
+    } catch (err) {
+      console.error('[Decision] Erreur lors du traitement:', err);
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Une erreur est survenue lors de l'enregistrement de votre décision.";
+      setDecisionError(msg);
+    } finally {
+      setIsSubmittingDecision(false);
+    }
   };
 
-  const counts = useMemo(
-    () => ({
-      all: requests.length,
-      pending: requests.filter((r) => r.status === 'pending').length,
-      accepted: requests.filter((r) => r.status === 'accepted').length,
-      rejected: requests.filter((r) => r.status === 'rejected').length,
-      appSent: requests.filter((r) => r.type !== 'suggestion' && r.direction === 'sent').length,
-      appReceived: requests.filter((r) => r.type !== 'suggestion' && r.direction === 'received').length,
-      sugSent: requests.filter((r) => r.type === 'suggestion' && r.direction === 'sent').length,
-      sugReceived: requests.filter((r) => r.type === 'suggestion' && r.direction === 'received').length
+  // Compile flat requests list
+  const requests = [
+    ...localRequests,
+    ...(pendingSuggestions || []).map((item) => {
+      const orgName = item.suggested_partner_name || item.partner_name || 'Partenaire';
+      return {
+        id: `sug_received_${item.id}`,
+        type: 'suggestion',
+        direction: 'received',
+        projectTitle: item.incident_details?.title || item.incident_title || (item.incident_id ? `Incident #${item.incident_id}` : 'Incident sans titre'),
+        projectImage: item.incident_details?.photo || item.incident_details?.image || '',
+        organisation: orgName,
+        organisationInitials: getInitials(orgName),
+        organisationColor: '#3AA2DD',
+        suggestedBy: item.suggested_by_name || 'Leader',
+        suggestedByRole: item.suggested_by_role || 'Leader',
+        suggestionMessage: item.justification || item.message || 'Pas de message.',
+        proposedCollaborators: (item.proposed_collaborators || []).map((pc) => ({
+          name: pc.partner_name || 'Partenaire',
+          initials: getInitials(pc.partner_name || 'PT'),
+          color: '#10B981',
+          role: pc.role || 'contributeur',
+          comment: pc.justification || ''
+        })),
+        status: item.status || 'pending',
+        submittedAt: item.created_at || new Date().toISOString(),
+        respondedAt: item.updated_at || null,
+        response: item.response_message || null,
+        incidentId: item.incident_id,
+        apiId: item.id
+      };
     }),
-    [requests]
-  );
+    ...(activeCollabs || []).map((item) => {
+      const orgName = item.organisation_name || item.leader_name || 'Organisation sans nom';
+      const projTitle = item.incident_details?.title || item.incident_title || (item.incident_id ? `Incident #${item.incident_id}` : 'Incident sans titre');
+      const projImg = item.incident_details?.photo || item.incident_details?.image || '';
+      return {
+        id: `collab_active_${item.id}`,
+        direction: 'sent',
+        projectTitle: projTitle,
+        projectImage: projImg,
+        organisation: orgName,
+        organisationInitials: getInitials(orgName),
+        organisationColor: '#22C55E',
+        role: item.role === 'leader' ? 'Leader' : (item.role === 'contributor' || item.role === 'contributeur') ? 'Contributeur' : 'Observateur',
+        motif: item.justification || 'Collaboration acceptée en cours.',
+        status: 'accepted',
+        submittedAt: item.created_at || new Date().toISOString(),
+        respondedAt: item.updated_at || null,
+        response: null,
+        incidentId: item.incident_details?.id || item.incident_id,
+        apiId: item.id
+      };
+    }),
+    ...(pendingInvitations || []).map((item) => {
+      const orgName = item.organisation_name || item.leader_name || 'Organisation sans nom';
+      const projTitle = item.incident_details?.title || item.incident_title || (item.incident_id ? `Incident #${item.incident_id}` : 'Incident sans titre');
+      const projImg = item.incident_details?.photo || item.incident_details?.image || '';
+      return {
+        id: `invitation_pending_${item.id}`,
+        direction: 'received',
+        applicantName: item.user_full_name || item.invited_member_name || 'Membre',
+        applicantOrg: orgName,
+        projectTitle: projTitle,
+        projectImage: projImg,
+        organisation: orgName,
+        organisationInitials: getInitials(orgName),
+        organisationColor: '#F59E0B',
+        role: item.role === 'leader' ? 'Leader' : (item.role === 'contributor' || item.role === 'contributeur') ? 'Contributeur' : 'Observateur',
+        motif: item.justification || 'Invitation en attente de réponse.',
+        status: 'pending',
+        submittedAt: item.created_at || new Date().toISOString(),
+        respondedAt: null,
+        response: null,
+        incidentId: item.incident_details?.id || item.incident_id,
+        apiId: item.id
+      };
+    })
+  ];
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return requests.filter((r) => {
-      const isSuggestion = r.type === 'suggestion';
-      const isSent = r.direction === 'sent';
-      if (typeFilter === 'app-sent' && (isSuggestion || !isSent)) return false;
-      if (typeFilter === 'app-received' && (isSuggestion || isSent)) return false;
-      if (typeFilter === 'sug-sent' && (!isSuggestion || !isSent)) return false;
-      if (typeFilter === 'sug-received' && (!isSuggestion || isSent)) return false;
-      if (statusFilter !== 'all' && r.status !== statusFilter) return false;
-      if (!q) return true;
-      return (
-        r.projectTitle.toLowerCase().includes(q) ||
-        r.organisation.toLowerCase().includes(q) ||
-        (r.role || r.proposedRole || '').toLowerCase().includes(q) ||
-        (r.applicantName || '').toLowerCase().includes(q) ||
-        (r.applicantOrg || '').toLowerCase().includes(q)
-      );
-    });
-  }, [search, statusFilter, typeFilter, requests]);
+  const q = search.trim().toLowerCase();
+  const filtered = requests.filter((r) => {
+    const isSuggestion = r.type === 'suggestion';
+    const isSent = r.direction === 'sent';
+    if (typeFilter === 'app-sent' && (isSuggestion || !isSent)) return false;
+    if (typeFilter === 'app-received' && (isSuggestion || isSent)) return false;
+    if (typeFilter === 'sug-sent' && (!isSuggestion || !isSent)) return false;
+    if (typeFilter === 'sug-received' && (!isSuggestion || isSent)) return false;
+    if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+    if (!q) return true;
+    return (
+      r.projectTitle.toLowerCase().includes(q) ||
+      r.organisation.toLowerCase().includes(q) ||
+      (r.role || r.proposedRole || '').toLowerCase().includes(q) ||
+      (r.applicantName || '').toLowerCase().includes(q) ||
+      (r.applicantOrg || '').toLowerCase().includes(q)
+    );
+  });
+
+  // Incident-centric grouping
+  const groupedIncidents = [];
+  const incidentsMap = {};
+
+  filtered.forEach((r) => {
+    const incidentId = r.incidentId || 'unknown';
+    if (!incidentsMap[incidentId]) {
+      incidentsMap[incidentId] = {
+        id: incidentId,
+        projectTitle: r.projectTitle || 'Incident sans titre',
+        projectImage: r.projectImage || '',
+        leader: null,
+        userCollab: null,
+        otherCollabs: [],
+        suggestions: []
+      };
+      groupedIncidents.push(incidentsMap[incidentId]);
+    }
+
+    const group = incidentsMap[incidentId];
+
+    if (r.type === 'suggestion') {
+      group.suggestions.push(r);
+    } else {
+      if (r.role?.toLowerCase() === 'leader' && r.status === 'accepted') {
+        group.leader = {
+          name: r.applicantName || r.organisation || 'Leader',
+          org: r.applicantOrg || r.organisation,
+          color: r.organisationColor || '#F59E0B'
+        };
+      }
+      const isForCurrentUser = r.direction === 'sent' || (r.direction === 'received' && !r.applicantName);
+      if (isForCurrentUser) {
+        group.userCollab = r;
+      } else {
+        group.otherCollabs.push(r);
+      }
+    }
+  });
+
+  // Resolve leader presence
+  groupedIncidents.forEach((group) => {
+    if (group.userCollab && group.userCollab.role?.toLowerCase() === 'leader') {
+      group.leader = {
+        name: 'Vous',
+        isMe: true,
+        color: '#F59E0B'
+      };
+    }
+    if (!group.leader) {
+      const activeLeader = group.otherCollabs.find(oc => oc.role?.toLowerCase() === 'leader' && oc.status === 'accepted');
+      if (activeLeader) {
+        group.leader = {
+          name: activeLeader.applicantName || activeLeader.organisation || 'Leader',
+          org: activeLeader.applicantOrg || activeLeader.organisation,
+          color: activeLeader.organisationColor || '#F59E0B'
+        };
+      }
+    }
+  });
+
+  const counts = {
+    all: requests.length,
+    pending: requests.filter((r) => r.status === 'pending').length,
+    accepted: requests.filter((r) => r.status === 'accepted').length,
+    rejected: requests.filter((r) => r.status === 'rejected').length,
+    appSent: requests.filter((r) => r.type !== 'suggestion' && r.direction === 'sent').length,
+    appReceived: requests.filter((r) => r.type !== 'suggestion' && r.direction === 'received').length,
+    sugSent: requests.filter((r) => r.type === 'suggestion' && r.direction === 'sent').length,
+    sugReceived: requests.filter((r) => r.type === 'suggestion' && r.direction === 'received').length
+  };
 
   const content = (
     <>
-      {/* Header (seulement si non embedded) */}
       {!embedded && (
         <div className="requests-page-header">
           <div>
             <h1 className="requests-title">Demandes de collaboration</h1>
             <p className="requests-subtitle">
-              Gérez vos demandes envoyées et les invitations reçues des organisations.
+              Gérez vos demandes de participation et suivez les rôles associés aux incidents.
             </p>
           </div>
         </div>
       )}
 
-      {/* Onglets type + direction */}
+      {/* Onglets type */}
       <div className="requests-type-tabs">
         <button
           type="button"
@@ -248,15 +455,6 @@ export const CollaborationRequests = ({
         </button>
         <button
           type="button"
-          className={`requests-type-tab ${typeFilter === 'sug-sent' ? 'is-active' : ''}`}
-          onClick={() => setTypeFilter('sug-sent')}
-        >
-          <Send2 size={16} variant="Bold" color="currentColor" />
-          Suggestions envoyées
-          <span className="requests-tab-badge">{counts.sugSent}</span>
-        </button>
-        <button
-          type="button"
           className={`requests-type-tab ${typeFilter === 'sug-received' ? 'is-active' : ''}`}
           onClick={() => setTypeFilter('sug-received')}
         >
@@ -276,7 +474,7 @@ export const CollaborationRequests = ({
           <SearchNormal1 size={18} variant="Linear" color="#6C7278" />
           <input
             type="text"
-            placeholder="Rechercher un projet, organisation, rôle…"
+            placeholder="Rechercher un incident, rôle, organisation…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -285,8 +483,7 @@ export const CollaborationRequests = ({
         <div className="requests-filters">
           <button
             type="button"
-            className={`requests-filter-pill ${statusFilter === 'all' ? 'is-active' : ''
-              }`}
+            className={`requests-filter-pill ${statusFilter === 'all' ? 'is-active' : ''}`}
             onClick={() => setStatusFilter('all')}
           >
             Toutes
@@ -294,336 +491,286 @@ export const CollaborationRequests = ({
           </button>
           <button
             type="button"
-            className={`requests-filter-pill ${statusFilter === 'pending' ? 'is-active' : ''
-              }`}
+            className={`requests-filter-pill ${statusFilter === 'pending' ? 'is-active' : ''}`}
             onClick={() => setStatusFilter('pending')}
           >
             <Clock size={14} variant="Bold" color="currentColor" />
             En attente
-            <span className="requests-filter-count">
-              {counts.pending}
-            </span>
+            <span className="requests-filter-count">{counts.pending}</span>
           </button>
           <button
             type="button"
-            className={`requests-filter-pill ${statusFilter === 'accepted' ? 'is-active' : ''
-              }`}
+            className={`requests-filter-pill ${statusFilter === 'accepted' ? 'is-active' : ''}`}
             onClick={() => setStatusFilter('accepted')}
           >
             <TickCircle size={14} variant="Bold" color="currentColor" />
-            Acceptées
-            <span className="requests-filter-count">
-              {counts.accepted}
-            </span>
-          </button>
-          <button
-            type="button"
-            className={`requests-filter-pill ${statusFilter === 'rejected' ? 'is-active' : ''
-              }`}
-            onClick={() => setStatusFilter('rejected')}
-          >
-            <CloseCircle size={14} variant="Bold" color="currentColor" />
-            Refusées
-            <span className="requests-filter-count">
-              {counts.rejected}
-            </span>
+            Actives
+            <span className="requests-filter-count">{counts.accepted}</span>
           </button>
         </div>
       </div>
 
-      {/* Liste */}
-      {filtered.length === 0 ? (
+      {/* Collapsible Info Banner (Scenarios 2 & 3 Explanation) */}
+      {showInfoBanner && (
+        <div className="collaboration-info-banner">
+          <div className="info-banner-content">
+            <InfoCircle size={24} variant="Bold" className="info-banner-icon" />
+            <div className="info-banner-text">
+              <h4>Règles de collaboration sur les Incidents</h4>
+              <p>
+                <strong>1. Sans Leader :</strong> Si aucun leader n'a encore pris l'incident en charge, toute demande d'observation ou de contribution est <strong>automatiquement acceptée</strong>.
+              </p>
+              <p>
+                <strong>2. Prise en charge par un Leader :</strong> Dès qu'une organisation prend en charge l'incident en tant que <strong>Leader</strong>, toutes les contributions existantes repassent en status <strong>"En attente"</strong> pour lui permettre de les valider manuellement. Les observateurs restent actifs.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="info-banner-close"
+            onClick={() => setShowInfoBanner(false)}
+            aria-label="Fermer"
+          >
+            <CloseCircle size={20} variant="Linear" />
+          </button>
+        </div>
+      )}
+
+      {/* Grouped Incident List */}
+      {groupedIncidents.length === 0 ? (
         <div className="requests-empty">
           <Briefcase size={48} variant="Linear" color="#9CA3AF" />
-          <p>Aucune demande ne correspond à vos critères.</p>
+          <p>Aucune collaboration ne correspond à vos critères.</p>
         </div>
       ) : (
-        <div className="requests-list">
-          {filtered.map((r) => {
-            const meta = STATUS_META[r.status];
-            const StatusIcon = meta.icon;
-            const isOpen = expanded === r.id;
-            const isSuggestion = r.type === 'suggestion';
-            const isSent = r.direction === 'sent';
-            const collaboratorsCount = r.proposedCollaborators?.length || 0;
+        <div className="incident-centric-list">
+          {groupedIncidents.map((incident) => {
+            const isExpanded = expandedIncident === incident.id;
+            const hasLeader = !!incident.leader;
+            const isUserLeader = incident.leader?.isMe;
 
-            const directionLabel = isSuggestion
-              ? isSent
-                ? 'Sugges. envoyée'
-                : 'Sugges. reçue'
-              : isSent
-                ? 'Deman. envoyée'
-                : 'Deman. reçue';
-            const DirectionIcon = isSent ? Export : Import;
+            // Status details for user's own participation
+            const myCollab = incident.userCollab;
+            const meta = myCollab ? STATUS_META[myCollab.status] : null;
+            const myRoleKey = myCollab?.role?.toLowerCase() === 'leader' ? 'leader' : 
+                              (myCollab?.role?.toLowerCase() === 'contributeur' || myCollab?.role?.toLowerCase() === 'contributor') ? 'contributor' : 'observer';
+            const myRoleMeta = myCollab ? ROLE_META[myRoleKey] : null;
+
+            // Find other accepted collaborators
+            const acceptedOthers = incident.otherCollabs.filter(c => c.status === 'accepted');
+            const pendingOthers = incident.otherCollabs.filter(c => c.status === 'pending');
 
             return (
-              <article
-                key={r.id}
-                className={`request-card ${meta.className} ${isOpen ? 'is-open' : ''
-                  } ${isSuggestion ? 'is-suggestion' : ''} ${isSent ? 'is-sent' : 'is-received'
-                  }`}
+              <section
+                key={incident.id}
+                className={`incident-group-card ${isExpanded ? 'is-expanded' : ''} ${hasLeader ? 'has-leader' : 'no-leader'}`}
               >
-                <div
-                  className="request-card-main"
-                  onClick={() => setExpanded(isOpen ? null : r.id)}
+                {/* Incident Group Header */}
+                <header
+                  className="incident-group-header"
+                  onClick={() => setExpandedIncident(isExpanded ? null : incident.id)}
                 >
                   <div
-                    className="request-thumb"
-                    style={{ backgroundImage: `url(${r.projectImage})` }}
-                  >
-                    <span
-                      className={`request-direction-tag ${isSent
-                          ? isSuggestion
-                            ? 'is-sent-suggestion'
-                            : 'is-sent-application'
-                          : isSuggestion
-                            ? 'is-received-suggestion'
-                            : 'is-received-application'
-                        }`}
-                    >
-
-                      {directionLabel}
-                    </span>
-                  </div>
-
-                  <div className="request-info">
-                    <div className="request-info-top">
-                      <div
-                        className="request-org-avatar"
-                        style={{
-                          backgroundColor: r.organisationColor
-                        }}
-                      >
-                        {r.organisationInitials}
-                      </div>
-                      <span className="request-org">
-                        {r.organisation}
-                      </span>
-                      <span className="request-dot">•</span>
-                      {isSuggestion ? (
-                        <span className="request-role-badge request-suggestion-count">
-                          <Building size={12} variant="Bold" color="#F59E0B" />
-                          {collaboratorsCount} org.{collaboratorsCount > 1 ? 's' : ''} proposée{collaboratorsCount > 1 ? 's' : ''}
+                    className="incident-group-thumb"
+                    style={{ backgroundImage: `url(${incident.projectImage})` }}
+                  />
+                  
+                  <div className="incident-group-title-section">
+                    <h3 className="incident-group-title">{incident.projectTitle}</h3>
+                    
+                    <div className="incident-group-status-badges">
+                      {/* Leader presence status */}
+                      {hasLeader ? (
+                        <span className={`leader-badge ${isUserLeader ? 'is-me' : ''}`}>
+                          <Crown1 size={13} variant="Bold" />
+                          {isUserLeader ? "Vous êtes le leader" : `Leader : ${incident.leader.name}`}
                         </span>
                       ) : (
-                        <span className="request-role">{r.role}</span>
+                        <span className="leader-badge no-leader">
+                          <InfoCircle size={13} variant="Bold" />
+                          Aucun leader (Contributions auto-acceptées)
+                        </span>
                       )}
-                    </div>
 
-                    <h3 className="request-project">{r.projectTitle}</h3>
-
-                    {!isSuggestion && !isSent && r.applicantName && (
-                      <div className="request-applicant">
-                        <span className="request-applicant-label">
-                          Candidat :
+                      {/* User's own role badge if participating */}
+                      {myCollab && myRoleMeta && (
+                        <span className="my-participation-badge" style={{ color: myRoleMeta.color, borderColor: myRoleMeta.color, backgroundColor: `${myRoleMeta.color}15` }}>
+                          {myRoleMeta.icon && <myRoleMeta.icon size={13} variant="Bold" />}
+                          Rôle : {myCollab.role}
                         </span>
-                        <strong>{r.applicantName}</strong>
-                        {r.applicantOrg && (
-                          <span className="request-applicant-org">
-                            — {r.applicantOrg}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-
-
-                    <div className="request-meta">
-                      <div className="request-meta-row">
-                        <Calendar
-                          size={13}
-                          variant="Bold"
-                          color="#6C7278"
-                        />
-                        <span>
-                          {isSent ? 'Envoyée' : 'Reçue'} le{' '}
-                          {formatDate(r.submittedAt)}
-                        </span>
-                      </div>
-                      {r.respondedAt && (
-                        <div className="request-meta-row">
-                          <MessageText1
-                            size={13}
-                            variant="Bold"
-                            color="#6C7278"
-                          />
-                          <span>
-                            Réponse le {formatDate(r.respondedAt)}
-                          </span>
-                        </div>
                       )}
                     </div>
                   </div>
 
-                  <div className="request-side">
-                    <span
-                      className={`request-status-badge ${meta.className}`}
-                    >
-                      <StatusIcon
-                        size={14}
-                        variant="Bold"
-                        color="#FFFFFF"
-                      />
-                      {meta.label}
-                    </span>
+                  <div className="incident-group-summary-side">
+                    {/* User's active/pending badge */}
+                    {myCollab && meta && (
+                      <span className={`request-status-badge ${meta.className}`}>
+                        {meta.label}
+                      </span>
+                    )}
+
                     <button
                       type="button"
-                      className="request-toggle"
-                      aria-label={isOpen ? 'Réduire' : 'Voir le détail'}
+                      className="incident-group-toggle"
+                      aria-label={isExpanded ? 'Réduire' : 'Développer'}
                     >
-                      <ArrowRight2
-                        size={18}
-                        variant="Linear"
-                        color="#6C7278"
-                      />
+                      <ArrowRight2 size={18} />
                     </button>
                   </div>
-                </div>
+                </header>
 
-                {isOpen && (
-                  <div className="request-card-body">
-                    {isSuggestion ? (
-                      <>
-                        <div className="request-block request-invitation-block">
-                          <h4 className="request-block-label">
-                            <Crown1 size={14} variant="Bold" color="#F59E0B" />
-                            Message du leader
-                          </h4>
-                          <p className="request-block-text">
-                            {r.suggestionMessage}
-                          </p>
-                          {r.suggestedBy && (
-                            <div className="request-invited-by">
-                              Suggéré par <strong>{r.suggestedBy}</strong>
-                              {r.suggestedByRole && (
-                                <span className="request-invited-role">
-                                  {' '}— {r.suggestedByRole}
-                                </span>
+                {/* Expanded content */}
+                {isExpanded && (
+                  <div className="incident-group-body">
+                    <div className="incident-details-grid">
+                      {/* Left: Your collaboration state details */}
+                      <div className="grid-column my-collab-details">
+                        <h4 className="detail-section-title">Votre participation</h4>
+                        {myCollab ? (
+                          <div className="my-collab-info-box">
+                            <p className="my-collab-motif">
+                              <strong>Votre motif :</strong> "{myCollab.motif || myCollab.suggestionMessage || 'Aucun motif renseigné'}"
+                            </p>
+                            
+                            {/* Contextual pending/accepted help text depending on Leader presence (Scenarios 2 & 3) */}
+                            <div className="scenario-explanation-box">
+                              {myCollab.status === 'pending' ? (
+                                <p className="status-note status-pending">
+                                  <Clock size={16} variant="Bold" />
+                                  {hasLeader ? (
+                                    <>
+                                      En attente de validation par le leader (<strong>{incident.leader.name}</strong>). 
+                                      <br /><span className="fine-note">Note : Un leader est en place, votre contribution est soumise à son approbation.</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      En attente. En l'absence de leader, votre demande sera acceptée automatiquement.
+                                    </>
+                                  )}
+                                </p>
+                              ) : myCollab.status === 'accepted' ? (
+                                <p className="status-note status-accepted">
+                                  <TickCircle size={16} variant="Bold" />
+                                  {myCollab.role?.toLowerCase() === 'observer' || myCollab.role?.toLowerCase() === 'observateur' ? (
+                                    <>Participation active en tant qu'observateur (Toujours approuvée).</>
+                                  ) : hasLeader ? (
+                                    <>Approuvée par le leader (<strong>{incident.leader.name}</strong>).</>
+                                  ) : (
+                                    <>Active (Auto-acceptée car aucun leader n'est désigné sur l'incident).</>
+                                  )}
+                                </p>
+                              ) : (
+                                <p className="status-note status-rejected">
+                                  <CloseCircle size={16} variant="Bold" />
+                                  Collaboration refusée. {myCollab.response && `Motif : "${myCollab.response}"`}
+                                </p>
                               )}
                             </div>
-                          )}
-                        </div>
-
-                        {r.proposedCollaborators &&
-                          r.proposedCollaborators.length > 0 && (
-                            <div className="request-block">
-                              <h4 className="request-block-label">
-                                <Building size={14} variant="Bold" color="#3AA2DD" />
-                                Organisations proposées ({r.proposedCollaborators.length})
-                              </h4>
-                              <div className="proposed-collabs-list">
-                                {r.proposedCollaborators.map((collab, idx) => {
-                                  const cRoleMeta = ROLE_META[collab.role];
-                                  const CRoleIcon = cRoleMeta?.icon;
-                                  return (
-                                    <div key={idx} className="proposed-collab-card">
-                                      <div className="proposed-collab-header">
-                                        <div
-                                          className="proposed-collab-avatar"
-                                          style={{ backgroundColor: collab.color }}
-                                        >
-                                          {collab.initials}
-                                        </div>
-                                        <div className="proposed-collab-info">
-                                          <div className="proposed-collab-name">
-                                            {collab.name}
-                                          </div>
-                                          {cRoleMeta && (
-                                            <span
-                                              className="proposed-collab-role"
-                                              style={{ color: cRoleMeta.color }}
-                                            >
-                                              {CRoleIcon && (
-                                                <CRoleIcon
-                                                  size={11}
-                                                  variant="Bold"
-                                                  color={cRoleMeta.color}
-                                                />
-                                              )}
-                                              {cRoleMeta.label}
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                      {collab.comment && (
-                                        <p className="proposed-collab-comment">
-                                          {collab.comment}
-                                        </p>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-                      </>
-                    ) : (
-                      <div className="request-block">
-                        <h4 className="request-block-label">Mon motif</h4>
-                        <p className="request-block-text">{r.motif}</p>
+                          </div>
+                        ) : (
+                          <p className="no-participation-text">Vous ne participez pas encore à cet incident.</p>
+                        )}
                       </div>
-                    )}
 
-
-
-                    {r.response && (
-                      <div
-                        className={`request-block request-response ${meta.className}`}
-                      >
-                        <h4 className="request-block-label">
-                          Réponse de l'organisation
-                        </h4>
-                        <p className="request-block-text">
-                          {r.response}
-                        </p>
-                      </div>
-                    )}
-
-                    {r.status === 'pending' && (
-                      <>
-                        <div className="request-pending-info">
-                          <Clock
-                            size={16}
-                            variant="Bold"
-                            color="#F59E0B"
-                          />
-                          <span>
-                            {isSent
-                              ? isSuggestion
-                                ? 'Suggestion en attente de validation par l\'organisation.'
-                                : 'Demande en attente de réponse de l\'organisation.'
-                              : isSuggestion
-                                ? 'Acceptez pour envoyer les invitations aux organisations proposées.'
-                                : 'Cette demande est en attente de votre décision.'}
-                          </span>
-                        </div>
-
-                        {!isSent && (
-                          <div className="request-actions">
-                            <button
-                              type="button"
-                              className="request-btn request-btn-respond"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openDecision(r);
-                              }}
-                            >
-                              <MessageText1
-                                size={16}
-                                variant="Bold"
-                                color="#FFFFFF"
-                              />
-                              {isSuggestion
-                                ? 'Traiter la suggestion'
-                                : 'Répondre à la demande'}
-                            </button>
+                      {/* Center: Collaborators Stack */}
+                      <div className="grid-column collaborators-section">
+                        <h4 className="detail-section-title">Collaborateurs actifs ({acceptedOthers.length})</h4>
+                        {acceptedOthers.length === 0 ? (
+                          <p className="no-collabs-text">Aucun autre collaborateur actif.</p>
+                        ) : (
+                          <div className="collabs-avatar-grid">
+                            {acceptedOthers.map((collab, idx) => {
+                              const key = collab.role?.toLowerCase() === 'leader' ? 'leader' : 
+                                          (collab.role?.toLowerCase() === 'contributeur' || collab.role?.toLowerCase() === 'contributor') ? 'contributor' : 'observer';
+                              const roleMeta = ROLE_META[key];
+                              return (
+                                <div key={idx} className="collab-avatar-card" title={`${collab.organisation || collab.applicantName} - ${collab.role}`}>
+                                  <div className="avatar-bubble" style={{ backgroundColor: collab.organisationColor || '#6C7278' }}>
+                                    {collab.organisationInitials || getInitials(collab.organisation || 'PT')}
+                                  </div>
+                                  <div className="avatar-details">
+                                    <span className="collab-name">{collab.organisation || collab.applicantName}</span>
+                                    <span className="collab-role" style={{ color: roleMeta?.color }}>
+                                      {roleMeta?.label || collab.role}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
-                      </>
-                    )}
+                      </div>
+
+                      {/* Right: Validation Actions for Leader or Suggestions */}
+                      <div className="grid-column actions-section">
+                        {/* Scenario validation box for leaders */}
+                        {isUserLeader ? (
+                          <>
+                            <h4 className="detail-section-title text-gold">Demandes à valider ({pendingOthers.length})</h4>
+                            {pendingOthers.length === 0 ? (
+                              <p className="no-actions-text">Aucune demande en attente de votre décision.</p>
+                            ) : (
+                              <div className="leader-pending-requests">
+                                {pendingOthers.map((pendingReq) => (
+                                  <div key={pendingReq.id} className="leader-action-box">
+                                    <div className="leader-action-info">
+                                      <strong>{pendingReq.applicantName || pendingReq.organisation}</strong>
+                                      <span className="request-role-badge contribution-pill">
+                                        {pendingReq.role}
+                                      </span>
+                                    </div>
+                                    <p className="leader-action-motif">"{pendingReq.motif}"</p>
+                                    
+                                    <div className="leader-action-buttons">
+                                      <button
+                                        type="button"
+                                        className="btn-action-accept"
+                                        onClick={() => openDecision(pendingReq)}
+                                      >
+                                        Accepter / Rejeter
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <h4 className="detail-section-title">Suggestions de partenaires ({incident.suggestions.length})</h4>
+                            {incident.suggestions.length === 0 ? (
+                              <p className="no-actions-text">Aucune suggestion pour cet incident.</p>
+                            ) : (
+                              <div className="incident-suggestions-list">
+                                {incident.suggestions.map((sug) => (
+                                  <div key={sug.id} className="sug-action-card">
+                                    <div className="sug-card-header">
+                                      <strong>{sug.organisation}</strong>
+                                      <span className="sug-count">({sug.proposedCollaborators?.length || 0} orgs)</span>
+                                    </div>
+                                    <p className="sug-justification">"{sug.suggestionMessage}"</p>
+                                    
+                                    {sug.status === 'pending' && (
+                                      <button
+                                        type="button"
+                                        className="sug-action-btn"
+                                        onClick={() => openDecision(sug)}
+                                      >
+                                        Traiter la suggestion
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
-              </article>
+              </section>
             );
           })}
         </div>
@@ -632,27 +779,19 @@ export const CollaborationRequests = ({
       {/* Decision modal */}
       {decisionRequest && (
         <div
-          className={`decision-modal-overlay ${decisionClosing ? 'closing' : ''
-            }`}
+          className={`decision-modal-overlay ${decisionClosing ? 'closing' : ''}`}
           onClick={closeDecision}
         >
           <aside
-            className={`decision-modal ${decisionAction
-                ? decisionAction === 'accept'
-                  ? 'is-accept'
-                  : 'is-reject'
-                : ''
-              } ${decisionClosing ? 'closing' : ''}`}
+            className={`decision-modal ${decisionAction ? (decisionAction === 'accept' ? 'is-accept' : 'is-reject') : ''} ${decisionClosing ? 'closing' : ''}`}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
-            aria-label="Répondre à la demande"
+            aria-label="Répondre"
           >
             <header className="decision-modal-header">
               <div>
                 <h3 className="decision-modal-title">
-                  {decisionRequest.type === 'suggestion'
-                    ? 'Traiter la suggestion'
-                    : 'Répondre à la demande'}
+                  {decisionRequest.type === 'suggestion' ? 'Traiter la suggestion' : 'Répondre à la demande'}
                 </h3>
                 <p className="decision-modal-subtitle">
                   {decisionRequest.projectTitle}
@@ -673,36 +812,29 @@ export const CollaborationRequests = ({
               onSubmit={handleConfirmDecision}
             >
               <div className="decision-modal-body">
+                {decisionError && (
+                  <div className="am-alert am-alert--danger" role="alert" style={{ marginBottom: 'var(--spacing-4)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CloseCircle size={18} variant="Bold" color="var(--color-danger)" />
+                    <span className="am-alert__message">{decisionError}</span>
+                  </div>
+                )}
+                
                 <div className="decision-summary">
                   <div
                     className="decision-summary-avatar"
-                    style={{
-                      backgroundColor: decisionRequest.organisationColor
-                    }}
+                    style={{ backgroundColor: decisionRequest.organisationColor }}
                   >
                     {decisionRequest.organisationInitials}
                   </div>
                   <div>
                     <span className="decision-summary-org">
-                      {decisionRequest.organisation}
+                      {decisionRequest.organisation || decisionRequest.applicantName}
                     </span>
                     <span className="decision-summary-role">
                       {decisionRequest.type === 'suggestion' ? (
-                        <>
-                          {decisionRequest.proposedCollaborators?.length || 0}{' '}
-                          organisation
-                          {(decisionRequest.proposedCollaborators?.length || 0) > 1
-                            ? 's'
-                            : ''}{' '}
-                          proposée
-                          {(decisionRequest.proposedCollaborators?.length || 0) > 1
-                            ? 's'
-                            : ''}
-                        </>
+                        <>{decisionRequest.proposedCollaborators?.length || 0} organisation(s) proposée(s)</>
                       ) : (
-                        <>
-                          Rôle demandé : <strong>{decisionRequest.role}</strong>
-                        </>
+                        <>Rôle : <strong>{decisionRequest.role}</strong></>
                       )}
                     </span>
                   </div>
@@ -710,158 +842,42 @@ export const CollaborationRequests = ({
 
                 <div className="decision-motif">
                   <h4 className="decision-block-label">
-                    {decisionRequest.type === 'suggestion'
-                      ? 'Message du leader'
-                      : 'Motif fourni'}
+                    {decisionRequest.type === 'suggestion' ? 'Message du leader' : 'Motif de participation'}
                   </h4>
                   <p className="decision-motif-text">
-                    {decisionRequest.type === 'suggestion'
-                      ? decisionRequest.suggestionMessage
-                      : decisionRequest.motif}
+                    {decisionRequest.type === 'suggestion' ? decisionRequest.suggestionMessage : decisionRequest.motif}
                   </p>
-                  {decisionRequest.type === 'suggestion' &&
-                    decisionRequest.suggestedBy && (
-                      <div className="decision-invited-by">
-                        Suggéré par <strong>{decisionRequest.suggestedBy}</strong>
-                        {decisionRequest.suggestedByRole && (
-                          <span> — {decisionRequest.suggestedByRole}</span>
-                        )}
-                      </div>
-                    )}
                 </div>
 
-                {/* Liste des organisations proposées */}
-                {decisionRequest.type === 'suggestion' &&
-                  decisionRequest.proposedCollaborators &&
-                  decisionRequest.proposedCollaborators.length > 0 && (
-                    <div className="decision-proposed">
-                      <h4 className="decision-block-label">
-                        Organisations à inviter ({decisionRequest.proposedCollaborators.length})
-                      </h4>
-                      <p className="decision-proposed-hint">
-                        Si vous acceptez, des invitations seront envoyées à ces organisations avec les rôles indiqués.
-                      </p>
-                      <div className="proposed-collabs-list">
-                        {decisionRequest.proposedCollaborators.map((collab, idx) => {
-                          const cRoleMeta = ROLE_META[collab.role];
-                          const CRoleIcon = cRoleMeta?.icon;
-                          return (
-                            <div key={idx} className="proposed-collab-card">
-                              <div className="proposed-collab-header">
-                                <div
-                                  className="proposed-collab-avatar"
-                                  style={{ backgroundColor: collab.color }}
-                                >
-                                  {collab.initials}
-                                </div>
-                                <div className="proposed-collab-info">
-                                  <div className="proposed-collab-name">
-                                    {collab.name}
-                                  </div>
-                                  {cRoleMeta && (
-                                    <span
-                                      className="proposed-collab-role"
-                                      style={{ color: cRoleMeta.color }}
-                                    >
-                                      {CRoleIcon && (
-                                        <CRoleIcon
-                                          size={11}
-                                          variant="Bold"
-                                          color={cRoleMeta.color}
-                                        />
-                                      )}
-                                      {cRoleMeta.label}
-                                    </span>
-                                  )}
-                                </div>
+                {/* Suggestions display */}
+                {decisionRequest.type === 'suggestion' && decisionRequest.proposedCollaborators && (
+                  <div className="decision-proposed">
+                    <h4 className="decision-block-label">Organisations à inviter ({decisionRequest.proposedCollaborators.length})</h4>
+                    <div className="proposed-collabs-list">
+                      {decisionRequest.proposedCollaborators.map((collab, idx) => {
+                        const cRoleMeta = ROLE_META[collab.role];
+                        return (
+                          <div key={idx} className="proposed-collab-card">
+                            <div className="proposed-collab-header">
+                              <div className="proposed-collab-avatar" style={{ backgroundColor: collab.color }}>
+                                {collab.initials}
                               </div>
-                              {collab.comment && (
-                                <p className="proposed-collab-comment">
-                                  {collab.comment}
-                                </p>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                {/* Suggestions d'organisations */}
-                {decisionRequest.suggestedOrganisations &&
-                  decisionRequest.suggestedOrganisations.length > 0 && (
-                    <div className="decision-suggestions">
-                      <h4 className="decision-block-label">
-                        Organisations suggérées ({decisionRequest.suggestedOrganisations.length})
-                      </h4>
-                      <p className="decision-suggestions-hint">
-                        {decisionRequest.organisation} recommande d'impliquer ces organisations. Acceptez ou refusez chaque suggestion :
-                      </p>
-                      <div className="decision-suggestions-list">
-                        {decisionRequest.suggestedOrganisations.map((org, idx) => {
-                          const status = suggestionsStatus[org.name];
-                          return (
-                            <div key={idx} className={`decision-suggestion-item ${status ? `is-${status}` : ''}`}>
-                              <div className="decision-suggestion-left">
-                                <div
-                                  className="decision-suggestion-avatar"
-                                  style={{ backgroundColor: org.color }}
-                                >
-                                  {org.initials}
-                                </div>
-                                <div className="decision-suggestion-info">
-                                  <div className="decision-suggestion-name">
-                                    {org.name}
-                                  </div>
-                                  <div className="decision-suggestion-reason">
-                                    {org.reason}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="decision-suggestion-actions">
-                                <button
-                                  type="button"
-                                  className={`decision-suggestion-btn is-accept ${status === 'accepted' ? 'is-active' : ''}`}
-                                  onClick={() =>
-                                    setSuggestionsStatus((prev) => ({
-                                      ...prev,
-                                      [org.name]: prev[org.name] === 'accepted' ? null : 'accepted'
-                                    }))
-                                  }
-                                  title="Accepter cette organisation"
-                                >
-                                  <TickCircle
-                                    size={18}
-                                    variant="Bold"
-                                    color={status === 'accepted' ? '#FFFFFF' : '#22C55E'}
-                                  />
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`decision-suggestion-btn is-reject ${status === 'rejected' ? 'is-active' : ''}`}
-                                  onClick={() =>
-                                    setSuggestionsStatus((prev) => ({
-                                      ...prev,
-                                      [org.name]: prev[org.name] === 'rejected' ? null : 'rejected'
-                                    }))
-                                  }
-                                  title="Refuser cette organisation"
-                                >
-                                  <CloseSquare
-                                    size={18}
-                                    variant="Bold"
-                                    color={status === 'rejected' ? '#FFFFFF' : '#EF4444'}
-                                  />
-                                </button>
+                              <div className="proposed-collab-info">
+                                <span className="proposed-collab-name">{collab.name}</span>
+                                <span className="proposed-collab-role" style={{ color: cRoleMeta?.color }}>
+                                  {cRoleMeta?.label || collab.role}
+                                </span>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
+                            {collab.comment && <p className="proposed-collab-comment">{collab.comment}</p>}
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
+                  </div>
+                )}
 
-                {/* Choix de la décision */}
+                {/* Action buttons */}
                 <div className="decision-choice-group" role="radiogroup">
                   <h4 className="decision-block-label">Votre décision</h4>
                   <div className="decision-choices">
@@ -869,56 +885,35 @@ export const CollaborationRequests = ({
                       type="button"
                       role="radio"
                       aria-checked={decisionAction === 'accept'}
-                      className={`decision-choice is-accept ${decisionAction === 'accept' ? 'is-selected' : ''
-                        }`}
+                      className={`decision-choice is-accept ${decisionAction === 'accept' ? 'is-selected' : ''}`}
                       onClick={() => setDecisionAction('accept')}
                     >
-                      <TickCircle
-                        size={22}
-                        variant="Bold"
-                        color={
-                          decisionAction === 'accept' ? '#FFFFFF' : '#22C55E'
-                        }
-                      />
+                      <TickCircle size={22} variant="Bold" color={decisionAction === 'accept' ? '#FFFFFF' : '#22C55E'} />
                       <span>Accepter</span>
                     </button>
                     <button
                       type="button"
                       role="radio"
                       aria-checked={decisionAction === 'reject'}
-                      className={`decision-choice is-reject ${decisionAction === 'reject' ? 'is-selected' : ''
-                        }`}
+                      className={`decision-choice is-reject ${decisionAction === 'reject' ? 'is-selected' : ''}`}
                       onClick={() => setDecisionAction('reject')}
                     >
-                      <CloseSquare
-                        size={22}
-                        variant="Bold"
-                        color={
-                          decisionAction === 'reject' ? '#FFFFFF' : '#EF4444'
-                        }
-                      />
+                      <CloseSquare size={22} variant="Bold" color={decisionAction === 'reject' ? '#FFFFFF' : '#EF4444'} />
                       <span>Refuser</span>
                     </button>
                   </div>
                 </div>
 
                 <label htmlFor="decision-response" className="decision-label">
-                  Message de réponse
-                  <span className="decision-optional">(optionnel)</span>
+                  Message de réponse <span className="decision-optional">(optionnel)</span>
                 </label>
                 <textarea
                   id="decision-response"
                   className="decision-textarea"
-                  rows={5}
+                  rows={4}
                   value={responseText}
                   onChange={(e) => setResponseText(e.target.value)}
-                  placeholder={
-                    decisionAction === 'accept'
-                      ? "Ex : Bienvenue dans l'équipe ! Vous serez recontacté(e) sous 48h."
-                      : decisionAction === 'reject'
-                        ? 'Ex : Merci pour votre intérêt. Le poste a déjà été pourvu.'
-                        : 'Saisissez un message à transmettre au demandeur…'
-                  }
+                  placeholder="Saisissez votre réponse..."
                 />
               </div>
 
@@ -927,44 +922,19 @@ export const CollaborationRequests = ({
                   type="button"
                   className="decision-btn-secondary"
                   onClick={closeDecision}
+                  disabled={isSubmittingDecision}
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className={`decision-btn-primary ${decisionAction === 'accept'
-                      ? 'is-accept'
-                      : decisionAction === 'reject'
-                        ? 'is-reject'
-                        : ''
-                    }`}
-                  disabled={!decisionAction}
+                  className={`decision-btn-primary ${decisionAction === 'accept' ? 'is-accept' : decisionAction === 'reject' ? 'is-reject' : ''}`}
+                  disabled={!decisionAction || isSubmittingDecision}
                 >
-                  {decisionAction === 'reject' ? (
-                    <>
-                      <CloseSquare
-                        size={16}
-                        variant="Bold"
-                        color="#FFFFFF"
-                      />
-                      {decisionRequest.type === 'suggestion'
-                        ? 'Refuser la suggestion'
-                        : 'Confirmer le refus'}
-                    </>
-                  ) : (
-                    <>
-                      <TickCircle
-                        size={16}
-                        variant="Bold"
-                        color="#FFFFFF"
-                      />
-                      {decisionAction === 'accept'
-                        ? decisionRequest.type === 'suggestion'
-                          ? 'Accepter et envoyer les invitations'
-                          : "Confirmer l'acceptation"
-                        : 'Confirmer'}
-                    </>
+                  {isSubmittingDecision && (
+                    <span className="spinner-mini" />
                   )}
+                  {decisionAction === 'reject' ? 'Confirmer le refus' : 'Confirmer l\'acceptation'}
                 </button>
               </footer>
             </form>
@@ -987,10 +957,7 @@ export const CollaborationRequests = ({
         onCollapsedChange={setSidebarCollapsed}
       />
 
-      <div
-        className={`requests-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''
-          }`}
-      >
+      <div className={`requests-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         <Header
           onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
           sidebarCollapsed={sidebarCollapsed}

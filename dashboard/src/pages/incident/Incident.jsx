@@ -6,6 +6,9 @@ import { Header, Sidebar } from '../../components/layout';
 import IncidentList from './components/IncidentList/IncidentList';
 import { getIncidentsService, getIncidentService } from './service/incident_service';
 import { authService } from '../auth/services/authService';
+import IncidentModalContext from './modale/IncidentModalContext';
+import IncidentDeleteModal from './modale/IncidentDeleteModal';
+import IncidentAssignModal from './modale/IncidentAssignModal';
 import './incident.css';
 
 // Fonction pour adapter les données de l'API au format attendu
@@ -17,7 +20,6 @@ const adaptIncidentData = (incident, currentUserId = null) => {
     const badges = {
       'declared': { label: 'DÉCLARÉ', variant: 'declared' },
       'taken_into_account': { label: 'PRIS EN COMPTE', variant: 'taken' },
-      'in_progress': { label: 'EN COURS', variant: 'in-progress' },
       'resolved': { label: 'RÉSOLU', variant: 'resolved' }
     };
     return badges[etat] || { label: 'EN COURS', variant: 'in-progress' };
@@ -30,6 +32,8 @@ const adaptIncidentData = (incident, currentUserId = null) => {
     type: incident.zone || incident.type || 'Non spécifié',
     image: incident.photo || incident.image,
     photo: incident.photo || incident.image, // Pour IncidentCard
+    organisation_name: incident.organisation_name || incident.user_id?.organisation_name || 'Non spécifié',
+    user_full_name: incident.user_full_name || (incident.user_id ? `${incident.user_id.first_name} ${incident.user_id.last_name}` : 'Non spécifié'),
     badges: [getBadgeFromEtat(incident.etat)],
     description: incident.description || 'Aucune description disponible',
     // Ajouter les coordonnées formatées
@@ -65,7 +69,7 @@ export const Incident = () => {
     isCollapsed: sidebarCollapsed,
     setCollapsed: setSidebarCollapsed,
   } = useSidebarState();
-  
+
   const workspaceClass = [
     'incident-workspace',
   ].join(' ');
@@ -74,11 +78,11 @@ export const Incident = () => {
   const currentUserId = sessionStorage.getItem('user_id');
 
   // Charger la liste des incidents avec useSWR
-  const { 
-    data: rawIncidents, 
-    error: incidentsError, 
+  const {
+    data: rawIncidents,
+    error: incidentsError,
     isLoading: isLoadingIncidents,
-    mutate: mutateIncidents 
+    mutate: mutateIncidents
   } = useSWR(
     '/incidents/all',
     () => getIncidentsService('all'),
@@ -95,33 +99,111 @@ export const Incident = () => {
   );
 
   // Adapter les données des incidents avec l'ID de l'utilisateur
-  const incidents = rawIncidents ? rawIncidents.map(inc => adaptIncidentData(inc, currentUserId)) : [];
+  const rawList = rawIncidents
+    ? Array.isArray(rawIncidents)
+      ? rawIncidents
+      : Array.isArray(rawIncidents.results)
+        ? rawIncidents.results
+        : []
+    : [];
+
+  const incidents = rawList.map((inc) => adaptIncidentData(inc, currentUserId));
+
+  // ── États locaux pour la gestion des modales d'incidents ─────────────────────
+  const [deleteModal, setDeleteModal] = useState({ open: false, incident: null });
+  const [assignModal, setAssignModal] = useState({ open: false, incident: null });
+  const [deleteAlert, setDeleteAlert] = useState({ type: null, message: null });
+  const [assignAlert, setAssignAlert] = useState({ type: null, message: null });
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [deleteClosing, setDeleteClosing] = useState(false);
+  const [assignClosing, setAssignClosing] = useState(false);
+
+  const openDeleteModal = (incident) => {
+    setDeleteModal({ open: true, incident });
+    setDeleteAlert({ type: null, message: null });
+    setDeleteClosing(false);
+  };
+
+  const closeDeleteModal = () => {
+    setDeleteClosing(true);
+    setTimeout(() => {
+      setDeleteModal({ open: false, incident: null });
+      setDeleteAlert({ type: null, message: null });
+      setDeleteClosing(false);
+    }, 280);
+  };
+
+  const openAssignModal = (incident) => {
+    setAssignModal({ open: true, incident });
+    setAssignAlert({ type: null, message: null });
+    setAssignClosing(false);
+  };
+
+  const closeAssignModal = () => {
+    setAssignClosing(true);
+    setTimeout(() => {
+      setAssignModal({ open: false, incident: null });
+      setAssignAlert({ type: null, message: null });
+      setAssignClosing(false);
+    }, 280);
+  };
+
+  const contextValue = {
+    deleteModal,
+    setDeleteModal,
+    assignModal,
+    setAssignModal,
+    deleteAlert,
+    setDeleteAlert,
+    assignAlert,
+    setAssignAlert,
+    isDeleting,
+    setIsDeleting,
+    isAssigning,
+    setIsAssigning,
+    deleteClosing,
+    setDeleteClosing,
+    assignClosing,
+    setAssignClosing,
+    mutateIncidents,
+    openDeleteModal,
+    closeDeleteModal,
+    openAssignModal,
+    closeAssignModal
+  };
 
   return (
-    <div className="incident-page">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        isCollapsed={sidebarCollapsed}
-        onCollapsedChange={setSidebarCollapsed}
-      />
-
-      <div className={`incident-page-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-        <Header
-          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
-          sidebarCollapsed={sidebarCollapsed}
+    <IncidentModalContext.Provider value={contextValue}>
+      <div className="incident-page">
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          isCollapsed={sidebarCollapsed}
+          onCollapsedChange={setSidebarCollapsed}
         />
 
-        <div className={workspaceClass}>
-          {/* Liste des incidents (Pleine largeur) */}
-          <IncidentList
-            incidents={incidents}
-            isLoading={isLoadingIncidents}
-            onSelectIncident={(id) => navigate(`/incidents/${id}`)}
+        <div className={`incident-page-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+          <Header
+            onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+            sidebarCollapsed={sidebarCollapsed}
           />
+
+          <div className={workspaceClass}>
+            {/* Liste des incidents (Pleine largeur) */}
+            <IncidentList
+              incidents={incidents}
+              isLoading={isLoadingIncidents}
+              onSelectIncident={(id) => navigate(`/incidents/${id}`)}
+            />
+          </div>
         </div>
+
+        {/* Modales d'actions d'incidents */}
+        <IncidentAssignModal />
+        <IncidentDeleteModal />
       </div>
-    </div>
+    </IncidentModalContext.Provider>
   );
 };
 

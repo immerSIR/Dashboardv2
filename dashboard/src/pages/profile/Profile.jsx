@@ -206,8 +206,8 @@ export const Profile = () => {
               <div className="profile-banner-content">
                 <div className="profile-avatar-wrap">
                   <div className="profile-avatar-large">
-                    {draft.avatar ? (
-                      <img src={draft.avatar} alt="Avatar" />
+                    {draft.avatar || draft.logo || draft.logo_url ? (
+                      <img src={draft.avatar || draft.logo || draft.logo_url} alt="Avatar/Logo" />
                     ) : (
                       <span>{initials}</span>
                     )}

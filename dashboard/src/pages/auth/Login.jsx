@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Sms, Eye, EyeSlash } from 'iconsax-react';
 import logoMapAction from '../../assets/logo.svg';
-import loginBg from '../../assets/login_bg.png';
+import loginBg from '../../assets/login_bg_1.svg';
 import { authService } from './services/authService';
 import './login.css';
 
@@ -49,10 +49,10 @@ export const Login = ({ onLogin }) => {
     <div className="login-split">
       {/* Colonne gauche - Formulaire */}
       <div className="login-side">
-       
+
 
         <div className="login-content">
-                     <img src={logoMapAction} alt="Map Action" className="login-brand-logo" />
+          <img src={logoMapAction} alt="Map Action" className="login-brand-logo" />
 
           <div className="login-intro">
             <p className="login-kicker">Bienvenue</p>

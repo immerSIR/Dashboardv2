@@ -7,6 +7,7 @@ import { Header, Sidebar } from '../../components/layout';
 import { CollaborationDetailProvider } from './context/CollaborationDetailContext';
 import { TaskModal } from './modal/TaskModal';
 import { SuggestOrgModal } from './modal/SuggestOrgModal';
+import { DeleteTaskModal } from './modal/DeleteTaskModal';
 import { getCollaborationService } from '../collaboration/service/collaboration_service';
 import { getOrganisationsService, formatOrganisation } from '../organisations/service/organisation_service';
 import {
@@ -23,6 +24,7 @@ import {
   deleteTaskService,
   updateTaskService
 } from '../incident/service/task_service';
+import { closeIncidentService } from '../incident/service/incident_service';
 import {
   ArrowLeft2,
   Location,
@@ -51,7 +53,6 @@ import {
   Play,
   Pause
 } from 'iconsax-react';
-import { collaborations } from '../collaboration/data/collaborations';
 import './collaboration-detail.css';
 
 const formatFailureReason = (reason) => {
@@ -228,6 +229,88 @@ const CustomAudioPlayer = ({ id, src, activeAudioId, setActiveAudioId }) => {
 export const CollaborationDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+
+  const formatEtat = (etat) => {
+    if (!etat) return 'Inconnu';
+    switch (etat) {
+      case 'taken_into_account':
+        return 'Pris en compte';
+      case 'resolved':
+        return 'Résolu';
+      case 'pending':
+        return 'En attente';
+      default:
+        return etat.charAt(0).toUpperCase() + etat.slice(1);
+    }
+  };
+
+  const getEtatBadgeClass = (etat) => {
+    switch (etat) {
+      case 'taken_into_account':
+        return 'badge-primary';
+      case 'resolved':
+        return 'badge-success';
+      case 'pending':
+        return 'badge-warning';
+      default:
+        return 'badge-info';
+    }
+  };
+
+  const formatStatus = (status) => {
+    if (!status) return 'Inconnu';
+    switch (status) {
+      case 'accepted':
+        return 'Acceptée';
+      case 'pending':
+        return 'En attente';
+      case 'rejected':
+        return 'Refusée';
+      default:
+        return status.charAt(0).toUpperCase() + status.slice(1);
+    }
+  };
+
+  const getStatusBadgeClass = (status) => {
+    switch (status) {
+      case 'accepted':
+        return 'badge-success';
+      case 'pending':
+        return 'badge-warning';
+      case 'rejected':
+        return 'badge-danger';
+      default:
+        return 'badge-info';
+    }
+  };
+
+  const formatRole = (role) => {
+    if (!role) return 'Membre';
+    switch (role) {
+      case 'leader':
+        return 'Leader';
+      case 'contributeur':
+        return 'Contributeur';
+      case 'observateur':
+        return 'Observateur';
+      default:
+        return role.charAt(0).toUpperCase() + role.slice(1);
+    }
+  };
+
+  const getRoleBadgeClass = (role) => {
+    switch (role) {
+      case 'leader':
+        return 'badge-warning';
+      case 'contributeur':
+        return 'badge-primary';
+      case 'observateur':
+        return 'badge-info';
+      default:
+        return 'badge-primary';
+    }
+  };
+
   const {
     isOpen: sidebarOpen,
     setOpen: setSidebarOpen,
@@ -325,16 +408,28 @@ export const CollaborationDetail = () => {
   const [newTaskStartDate, setNewTaskStartDate] = useState(getTodayStr());
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [taskModalClosing, setTaskModalClosing] = useState(false);
+  const [taskModalShowing, setTaskModalShowing] = useState(false);
 
   // États pour le modal de suggestion d'organisations
   const [showSuggestModal, setShowSuggestModal] = useState(false);
   const [suggestModalClosing, setSuggestModalClosing] = useState(false);
+  const [suggestModalShowing, setSuggestModalShowing] = useState(false);
   const [suggestSearch, setSuggestSearch] = useState('');
   const [suggestedOrgs, setSuggestedOrgs] = useState([]);
   const [suggestAlert, setSuggestAlert] = useState(null);
   const [suggestSubmitting, setSuggestSubmitting] = useState(false);
   const [activeProofPreview, setActiveProofPreview] = useState(null);
   const [expandedCompletedProofs, setExpandedCompletedProofs] = useState([]);
+
+  // États pour le modal de clôture d'incident
+  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [closeModalShowing, setCloseModalShowing] = useState(false);
+  const [resolutionStartDate, setResolutionStartDate] = useState('');
+  const [resolutionEndDate, setResolutionEndDate] = useState('');
+  const [resolutionFile, setResolutionFile] = useState(null);
+  const [closeAlert, setCloseAlert] = useState(null);
+  const [isClosing, setIsClosing] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState(null);
 
   const toggleCompletedProof = (taskId) => {
     setExpandedCompletedProofs(prev =>
@@ -398,20 +493,38 @@ export const CollaborationDetail = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages?.length]);
 
+  // Bloquer le scroll du body quand un modal est ouvert
+  useEffect(() => {
+    if (showTaskModal || showSuggestModal || showCloseModal || taskToDelete !== null) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showTaskModal, showSuggestModal, showCloseModal, taskToDelete]);
+
   // Mapper les données API vers le format attendu par le composant
   const collaboration = collaborationData ? {
     id: collaborationData.id,
     userRole: collaborationData.role,
-    title: `Incident #${collaborationData.incident}`,
+    title: collaborationData.incident_details?.title || collaborationData.incident_title || `Incident #${collaborationData.incident}`,
     incidentId: collaborationData.incident,
     userId: collaborationData.user,
     status: collaborationData.status,
     createdAt: collaborationData.created_at,
     motivation: collaborationData.motivation,
-    endDate: collaborationData.end_date,
+    endDate: collaborationData.end_date
+      ? new Date(collaborationData.end_date).toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      })
+      : 'En cours',
     otherOption: collaborationData.other_option,
-    image: '',
-    organisation: `Utilisateur #${collaborationData.user}`,
+    image: collaborationData.incident_details?.photo || '',
+    organisation: collaborationData.organisation_name || `Utilisateur #${collaborationData.user}`,
     role: collaborationData.role,
     joinedAt: new Date(collaborationData.created_at).toLocaleDateString('fr-FR', {
       day: 'numeric',
@@ -423,10 +536,16 @@ export const CollaborationDetail = () => {
       month: 'short',
       year: 'numeric'
     }),
-    location: 'À définir',
-    description: collaborationData.motivation || 'Aucune description',
-    progress: 0,
-    tasks: []
+    location: collaborationData.incident_details?.zone || 'À définir',
+    description: collaborationData.incident_details?.description || collaborationData.motivation || 'Aucune description',
+    progress: collaborationData.incident_details?.progress || 0,
+    tasks: [],
+    // Informations additionnelles retournées par l'API
+    userFullName: collaborationData.user_full_name,
+    userEmail: collaborationData.user_email,
+    organisationId: collaborationData.organisation_id,
+    incidentDetails: collaborationData.incident_details,
+    predictionDetails: collaborationData.prediction_details
   } : null;
 
   // Utiliser les tâches de l'API en les formatant pour l'affichage
@@ -450,6 +569,10 @@ export const CollaborationDetail = () => {
     });
   }, [tasksData, collaboration]);
 
+  const hasUnresolvedOrFailedTasks = useMemo(() => {
+    return currentTasks.some(task => !task.completed || task.failed);
+  }, [currentTasks]);
+
   // Gestion des états de chargement et d'erreur
   if (isLoading) {
     return (
@@ -460,11 +583,21 @@ export const CollaborationDetail = () => {
           isCollapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
-        <div className={`${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+        <div className={`collab-detail-main-wrapper ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
           <main className="collaboration-detail-page-wrapper">
             <div className="collaboration-detail-page">
               {/* Header Shimmer */}
               <header className="collab-detail-header">
+                <button
+                  className="menu-toggle btn btn-icon"
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  aria-label="Toggle menu"
+                  style={{ display: isMobile ? 'flex' : 'none', marginRight: '8px' }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M3 12h18M3 6h18M3 18h18" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
                 <button
                   type="button"
                   className="detail-back-btn"
@@ -492,47 +625,62 @@ export const CollaborationDetail = () => {
                     <div className="collab-detail-section">
                       <h3 className="collab-detail-section-title">Détails de la collaboration</h3>
 
-                      {/* Role badge shimmer */}
-                      <div style={{ marginBottom: '16px', width: '150px' }}>
-                        <ShimmerThumbnail height={32} rounded />
-                      </div>
-
-                      {/* Description shimmer */}
-                      <div className="collab-detail-info-block">
-                        <h4 className="collab-detail-info-label">Description</h4>
-                        <ShimmerText line={3} gap={8} />
-                      </div>
-
-                      {/* Meta info list shimmer */}
-                      <div className="collab-detail-info-block">
-                        <h4 className="collab-detail-info-label">Informations</h4>
-                        <div className="collab-detail-meta-list">
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <ShimmerThumbnail height={16} width={16} rounded />
-                            <div style={{ width: '120px' }}><ShimmerText line={1} gap={0} /></div>
-                          </div>
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '8px' }}>
-                            <ShimmerThumbnail height={16} width={16} rounded />
-                            <div style={{ width: '180px' }}><ShimmerText line={1} gap={0} /></div>
-                          </div>
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '8px' }}>
-                            <ShimmerThumbnail height={16} width={16} rounded />
-                            <div style={{ width: '150px' }}><ShimmerText line={1} gap={0} /></div>
-                          </div>
-                        </div>
-                      </div>
-
                       {/* Progress bar shimmer */}
-                      <div className="collab-detail-info-block">
-                        <h4 className="collab-detail-info-label">Progression globale</h4>
+                      <div className="collab-detail-subsection">
+                        <h4 className="collab-detail-subsection-title">Progression globale</h4>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                           <div style={{ width: '60px' }}><ShimmerText line={1} /></div>
                           <div style={{ width: '40px' }}><ShimmerText line={1} /></div>
                         </div>
                         <ShimmerThumbnail height={8} rounded />
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                          <div style={{ width: '80px' }}><ShimmerText line={1} /></div>
-                          <div style={{ width: '80px' }}><ShimmerText line={1} /></div>
+                      </div>
+
+                      {/* Subsection 1: L'Incident */}
+                      <div className="collab-detail-subsection">
+                        <h4 className="collab-detail-subsection-title">L'Incident</h4>
+                        <div className="collab-detail-meta-group">
+                          <div className="collab-detail-meta-row">
+                            <span className="collab-detail-meta-label">Titre</span>
+                            <div style={{ width: '80%', marginTop: '4px' }}><ShimmerText line={1} gap={0} /></div>
+                          </div>
+                          <div className="collab-detail-meta-row">
+                            <span className="collab-detail-meta-label">Catégorie</span>
+                            <div style={{ width: '40%', marginTop: '4px' }}><ShimmerThumbnail height={20} rounded /></div>
+                          </div>
+                          <div className="collab-detail-meta-row">
+                            <span className="collab-detail-meta-label">Zone</span>
+                            <div style={{ width: '90%', marginTop: '4px' }}><ShimmerText line={2} gap={4} /></div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Subsection 2: Impact Estimé */}
+                      <div className="collab-detail-subsection">
+                        <h4 className="collab-detail-subsection-title">Analyse d'Impact IA</h4>
+                        <div className="collab-detail-meta-group">
+                          <div className="collab-detail-meta-row">
+                            <span className="collab-detail-meta-label">Score de gravité</span>
+                            <div style={{ width: '30%', marginTop: '4px' }}><ShimmerThumbnail height={32} rounded /></div>
+                          </div>
+                          <div className="collab-detail-meta-row">
+                            <span className="collab-detail-meta-label">Recommandation</span>
+                            <div style={{ width: '95%', marginTop: '4px' }}><ShimmerText line={2} gap={4} /></div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Subsection 3: La Collaboration */}
+                      <div className="collab-detail-subsection">
+                        <h4 className="collab-detail-subsection-title">La Collaboration</h4>
+                        <div className="collab-detail-meta-group">
+                          <div className="collab-detail-meta-row">
+                            <span className="collab-detail-meta-label">Votre rôle</span>
+                            <div style={{ width: '35%', marginTop: '4px' }}><ShimmerThumbnail height={24} rounded /></div>
+                          </div>
+                          <div className="collab-detail-meta-row">
+                            <span className="collab-detail-meta-label">Organisation</span>
+                            <div style={{ width: '70%', marginTop: '4px' }}><ShimmerText line={1} gap={0} /></div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -737,7 +885,7 @@ export const CollaborationDetail = () => {
     }
   };
 
-  // Uploader une preuve (image/vidéo) pour terminer une tâche via API
+  // Uploader une preuve (image/vidéo/document) pour terminer une tâche via API
   const handleProofUpload = async (taskId, file) => {
     setProofUploadError(null);
     setProofUploadSuccess(null);
@@ -745,7 +893,10 @@ export const CollaborationDetail = () => {
       const formData = new FormData();
       if (file.type && file.type.startsWith('video/')) {
         formData.append('proof_video', file);
+      } else if (file.type && file.type.startsWith('image/')) {
+        formData.append('proof_image', file);
       } else {
+        // Pour les documents (PDF, Word, Excel, etc.)
         formData.append('proof_image', file);
       }
       await completeTaskService(incidentId, taskId, formData);
@@ -772,6 +923,9 @@ export const CollaborationDetail = () => {
   // Ouvrir le modal des tâches avec initialisation
   const openTaskModal = () => {
     setShowTaskModal(true);
+    setTimeout(() => {
+      setTaskModalShowing(true);
+    }, 10);
   };
 
   // Ajouter une tâche à la liste temporaire (draft)
@@ -1182,6 +1336,7 @@ export const CollaborationDetail = () => {
   };
 
   const closeTaskModal = () => {
+    setTaskModalShowing(false);
     setTaskModalClosing(true);
     setTimeout(() => {
       setShowTaskModal(false);
@@ -1193,11 +1348,12 @@ export const CollaborationDetail = () => {
       setNewTaskDeadline('');
       setTaskSubmitAlert(null);
       setTaskSubmitSaving(false);
-    }, 280);
+    }, 300);
   };
 
   // Fermeture du modal de suggestion avec animation
   const closeSuggestModal = () => {
+    setSuggestModalShowing(false);
     setSuggestModalClosing(true);
     setTimeout(() => {
       setShowSuggestModal(false);
@@ -1205,7 +1361,66 @@ export const CollaborationDetail = () => {
       setSuggestSearch('');
       setSuggestedOrgs([]);
       setSuggestAlert(null);
-    }, 280);
+    }, 300);
+  };
+
+  // Ouvrir le modal de clôture d'incident
+  const openCloseModal = () => {
+    setShowCloseModal(true);
+    setResolutionStartDate('');
+    setResolutionEndDate('');
+    setResolutionFile(null);
+    setCloseAlert(null);
+    setTimeout(() => {
+      setCloseModalShowing(true);
+    }, 10);
+  };
+
+  // Fermer le modal de clôture d'incident
+  const closeCloseModal = () => {
+    setCloseModalShowing(false);
+    setTimeout(() => {
+      setShowCloseModal(false);
+      setResolutionStartDate('');
+      setResolutionEndDate('');
+      setResolutionFile(null);
+      setCloseAlert(null);
+    }, 300);
+  };
+
+  // Clôturer l'incident
+  const handleCloseIncident = async () => {
+    if (!resolutionStartDate || !resolutionEndDate) {
+      setCloseAlert({ type: 'danger', message: 'Veuillez renseigner les deux dates.' });
+      return;
+    }
+
+    if (new Date(resolutionStartDate) > new Date(resolutionEndDate)) {
+      setCloseAlert({ type: 'danger', message: 'La date de début doit être antérieure à la date de fin.' });
+      return;
+    }
+
+    setIsClosing(true);
+    setCloseAlert(null);
+
+    try {
+      await closeIncidentService(collaboration.incidentId, {
+        resolution_start_date: resolutionStartDate,
+        resolution_end_date: resolutionEndDate,
+        resolution_file: resolutionFile
+      });
+      setCloseAlert({ type: 'success', message: 'Incident résolu avec succès !' });
+      setTimeout(() => {
+        closeCloseModal();
+        window.location.reload(); // Recharger pour mettre à jour l'état
+      }, 2000);
+    } catch (err) {
+      console.error('[CloseIncident] Erreur:', err);
+      const errorMsg = err?.detail || err?.message || 'Erreur lors de la résolution de l\'incident.';
+      setCloseAlert({ type: 'danger', message: errorMsg });
+    } finally {
+      setIsClosing(false);
+    }
   };
 
   // Envoi des suggestions d'organisations partenaires
@@ -1216,6 +1431,8 @@ export const CollaborationDetail = () => {
     const errors = [];
     const successes = [];
 
+
+
     const results = await Promise.allSettled(
       suggestedOrgs.map(org =>
         suggestCollaborationPartnerService(collaboration.incidentId, {
@@ -1224,11 +1441,40 @@ export const CollaborationDetail = () => {
           suggested_role: org.role === 'observateur' ? 'observer' : 'contributor',
           justification: org.comment || ''
         }).then(() => ({ ok: true, name: org.name }))
-          .catch(err => ({
-            ok: false,
-            name: org.name,
-            detail: err?.response?.data?.detail || err?.response?.data?.message || err?.message || 'Erreur inconnue'
-          }))
+          .catch(err => {
+            const data = err?.response?.data;
+            let errorDetail = 'Erreur inconnue';
+            if (data) {
+              if (data.non_field_errors && Array.isArray(data.non_field_errors)) {
+                const msg = data.non_field_errors[0];
+                errorDetail = msg.includes('unique set')
+                  ? 'déjà invitée ou suggérée pour cet incident'
+                  : msg;
+              } else if (data.detail) {
+                errorDetail = data.detail;
+              } else if (data.message) {
+                errorDetail = data.message;
+              } else {
+                const keys = Object.keys(data);
+                if (keys.length > 0) {
+                  const val = data[keys[0]];
+                  const msg = Array.isArray(val) ? val[0] : String(val);
+                  errorDetail = msg.includes('unique set')
+                    ? 'déjà invitée ou suggérée pour cet incident'
+                    : msg;
+                } else {
+                  errorDetail = err?.message || 'Erreur inconnue';
+                }
+              }
+            } else {
+              errorDetail = err?.message || 'Erreur inconnue';
+            }
+            return {
+              ok: false,
+              name: org.name,
+              detail: errorDetail
+            };
+          })
       )
     );
 
@@ -1252,6 +1498,8 @@ export const CollaborationDetail = () => {
 
   // Gestion des organisations suggérées
   const toggleSuggestedOrg = (org) => {
+
+
     setSuggestedOrgs(prev => {
       const exists = prev.find(o => o.id === org.id);
       if (exists) {
@@ -1297,6 +1545,7 @@ export const CollaborationDetail = () => {
     collaboration,
     showSuggestModal,
     suggestModalClosing,
+    suggestModalShowing,
     closeSuggestModal,
     suggestSearch,
     setSuggestSearch,
@@ -1314,6 +1563,7 @@ export const CollaborationDetail = () => {
     setShowTaskModal,
     taskModalClosing,
     setTaskModalClosing,
+    taskModalShowing,
     closeTaskModal,
     openTaskModal,
     draftTasks,
@@ -1347,7 +1597,9 @@ export const CollaborationDetail = () => {
     startEditTask,
     cancelEditTask,
     saveEditTask,
-    deleteTask
+    deleteTask,
+    taskToDelete,
+    setTaskToDelete
   };
 
   return (
@@ -1360,13 +1612,23 @@ export const CollaborationDetail = () => {
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
 
-        <div className={`  ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+        <div className={`collab-detail-main-wrapper ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
 
 
           <main className=" collaboration-detail-page-wrapper">
             <div className="collaboration-detail-page">
               {/* Header */}
               <header className="collab-detail-header">
+                <button
+                  className="menu-toggle btn btn-icon"
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  aria-label="Toggle menu"
+                  style={{ display: isMobile ? 'flex' : 'none', marginRight: '8px' }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M3 12h18M3 6h18M3 18h18" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
                 <button
                   type="button"
                   className="detail-back-btn"
@@ -1382,11 +1644,21 @@ export const CollaborationDetail = () => {
                     {collaboration?.organisation} • {collaboration?.location}
                   </p>
                 </div>
-                {isCollabClosed(collaboration?.id) && (
+                {isCollabClosed(collaboration?.id) ? (
                   <div className="collab-detail-closed-badge">
                     <Lock1 size={16} variant="Bold" color="#FFFFFF" />
                     Clôturée
                   </div>
+                ) : collaboration?.userRole === 'leader' && (
+                  <button
+                    type="button"
+                    onClick={openCloseModal}
+                    className='btn btn-success'
+                    disabled={hasUnresolvedOrFailedTasks}
+                    title={hasUnresolvedOrFailedTasks ? "Toutes les tâches doivent être complétées et aucune ne doit avoir échoué pour résoudre l'incident." : "Résoudre l'incident"}
+                  >
+                    Résoudre l'incident
+                  </button>
                 )}
               </header>
 
@@ -1404,40 +1676,9 @@ export const CollaborationDetail = () => {
                         </div>
                       )}
 
-                      {collaboration?.userRole && (
-                        <div className={`collab-detail-role collab-role-${collaboration?.userRole}`}>
-                          {collaboration?.userRole === 'leader' && <Crown1 size={16} variant="Bold" color="#F59E0B" />}
-                          {collaboration?.userRole === 'contributeur' && <People size={16} variant="Bold" color="#3AA2DD" />}
-                          {collaboration?.userRole === 'observateur' && <Eye size={16} variant="Bold" color="#6C7278" />}
-                          <span>Votre rôle : {collaboration?.userRole.charAt(0).toUpperCase() + collaboration?.userRole.slice(1)}</span>
-                        </div>
-                      )}
-
-                      <div className="collab-detail-info-block">
-                        <h4 className="collab-detail-info-label">Description</h4>
-                        <p className="collab-detail-description">{collaboration?.description}</p>
-                      </div>
-
-                      <div className="collab-detail-info-block">
-                        <h4 className="collab-detail-info-label">Informations</h4>
-                        <div className="collab-detail-meta-list">
-                          <div className="collab-detail-meta-item">
-                            <Location size={16} variant="Bold" color="var(--color-text-secondary)" />
-                            <span>{collaboration?.location}</span>
-                          </div>
-                          <div className="collab-detail-meta-item">
-                            <Calendar size={16} variant="Bold" color="var(--color-text-secondary)" />
-                            <span>{collaboration?.startDate} → {collaboration?.endDate}</span>
-                          </div>
-                          <div className="collab-detail-meta-item">
-                            <People size={16} variant="Bold" color="var(--color-text-secondary)" />
-                            <span>Organisation : {collaboration?.organisation}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="collab-detail-info-block">
-                        <h4 className="collab-detail-info-label">Progression globale</h4>
+                      {/* Progression globale */}
+                      <div className="collab-detail-subsection">
+                        <h4 className="collab-detail-subsection-title">Progression globale</h4>
                         <div className="collab-detail-progress">
                           <div className="collab-detail-progress-header">
                             {hasPendingChanges() && (
@@ -1462,26 +1703,208 @@ export const CollaborationDetail = () => {
                             <span>•</span>
                             <span>{currentTasks.filter(t => !t.completed && !t.failed).length} en cours</span>
                           </div>
-
                         </div>
                       </div>
 
-                      {/* Bouton suggérer des organisations */}
-                      {/*   {(collaboration?.userRole === 'leader' ||
-                   collaboration?.userRole === 'contributeur') 
-                   && !isCollabClosed(collaboration?.id) && (
-                     */}
-                      <div className="collab-detail-info-block">
+                      {/* Subsection 1: L'Incident (Most Important) */}
+                      <div className="collab-detail-subsection">
+                        <h4 className="collab-detail-subsection-title">L'Incident</h4>
+                        <div className="collab-detail-meta-group">
+                          {collaboration?.title && (
+                            <div className="collab-detail-meta-row">
+                              <span className="collab-detail-meta-label">Titre</span>
+                              <span className="collab-detail-meta-val text-highlight">{collaboration.title}</span>
+                            </div>
+                          )}
+                          {(collaboration?.predictionDetails?.sub_category || collaboration?.predictionDetails?.macro_category) && (
+                            <div className="collab-detail-meta-row">
+                              <span className="collab-detail-meta-label">Catégorie</span>
+                              <span className="collab-detail-meta-val">
+                                <span className="collab-detail-badge badge-primary">
+                                  {collaboration.predictionDetails.sub_category || collaboration.predictionDetails.macro_category}
+                                </span>
+                              </span>
+                            </div>
+                          )}
+                          {(collaboration?.predictionDetails?.display_name || collaboration?.location) && (
+                            <div className="collab-detail-meta-row">
+                              <span className="collab-detail-meta-label">Zone / Localisation</span>
+                              <span className="collab-detail-meta-val">{collaboration.predictionDetails?.display_name || collaboration.location}</span>
+                            </div>
+                          )}
+                          {(collaboration?.predictionDetails?.latitude || collaboration?.incidentDetails?.lattitude) && (
+                            <div className="collab-detail-meta-row">
+                              <span className="collab-detail-meta-label">Coordonnées</span>
+                              <span className="collab-detail-meta-val">
+                                {collaboration.predictionDetails?.latitude || collaboration.incidentDetails?.lattitude}, {collaboration.predictionDetails?.longitude || collaboration.incidentDetails?.longitude}
+                              </span>
+                            </div>
+                          )}
+                          {collaboration?.incidentDetails?.etat && (
+                            <div className="collab-detail-meta-row">
+                              <span className="collab-detail-meta-label">État incident</span>
+                              <span className="collab-detail-meta-val">
+                                <span className={`collab-detail-badge ${getEtatBadgeClass(collaboration.incidentDetails.etat)}`}>
+                                  {formatEtat(collaboration.incidentDetails.etat)}
+                                </span>
+                              </span>
+                            </div>
+                          )}
+                          {collaboration?.description && (
+                            <div className="collab-detail-meta-row">
+                              <span className="collab-detail-meta-label">Description</span>
+                              <span className="collab-detail-meta-val" style={{ whiteSpace: 'pre-wrap' }}>{collaboration.description}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Subsection 2: Impact Estimé & IA (Second Most Important) */}
+                      <div className="collab-detail-subsection">
+                        <h4 className="collab-detail-subsection-title">Analyse d'Impact IA</h4>
+                        {collaboration?.predictionDetails ? (
+                          <div className="collab-detail-meta-group">
+                            {collaboration.predictionDetails.global_impact_score !== undefined && (
+                              <div className="collab-detail-meta-row">
+                                <span className="collab-detail-meta-label">Score de gravité</span>
+                                <div className="collab-detail-gravity-badge">
+                                  {collaboration.predictionDetails.global_impact_score}
+                                  <span className="collab-detail-gravity-max">/10</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {collaboration.predictionDetails.recommendation && (
+                              <div className="collab-detail-meta-row">
+                                <span className="collab-detail-meta-label">Recommandation</span>
+                                <span className="collab-detail-meta-val text-highlight" style={{ fontSize: '13px' }}>
+                                  {collaboration.predictionDetails.recommendation}
+                                </span>
+                              </div>
+                            )}
+
+                            {collaboration.predictionDetails.total_population_exposed !== undefined && (
+                              <div className="collab-detail-meta-row">
+                                <span className="collab-detail-meta-label">Population exposée</span>
+                                <span className="collab-detail-meta-val" style={{ fontWeight: '600' }}>
+                                  {collaboration.predictionDetails.total_population_exposed} personnes
+                                </span>
+                                {(collaboration.predictionDetails.children_exposed !== undefined ||
+                                  collaboration.predictionDetails.adult_men_exposed !== undefined ||
+                                  collaboration.predictionDetails.adult_women_exposed !== undefined) && (
+                                    <span className="collab-detail-meta-val" style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                                      (Enfants : {collaboration.predictionDetails.children_exposed || 0}, Hommes : {collaboration.predictionDetails.adult_men_exposed || 0}, Femmes : {collaboration.predictionDetails.adult_women_exposed || 0})
+                                    </span>
+                                  )}
+                              </div>
+                            )}
+
+                            {(collaboration.predictionDetails.residential_buildings !== undefined ||
+                              collaboration.predictionDetails.water_points !== undefined) && (
+                                <div className="collab-detail-meta-row">
+                                  <span className="collab-detail-meta-label">Infrastructures à risque</span>
+                                  <span className="collab-detail-meta-val">
+                                    {[
+                                      collaboration.predictionDetails.residential_buildings !== undefined && `${collaboration.predictionDetails.residential_buildings} bâtiment(s) résidentiel(s)`,
+                                      collaboration.predictionDetails.water_points !== undefined && `${collaboration.predictionDetails.water_points} point(s) d'eau`,
+                                      collaboration.predictionDetails.schools !== undefined && collaboration.predictionDetails.schools > 0 && `${collaboration.predictionDetails.schools} école(s)`,
+                                      collaboration.predictionDetails.health_centers !== undefined && collaboration.predictionDetails.health_centers > 0 && `${collaboration.predictionDetails.health_centers} centre(s) de santé`
+                                    ].filter(Boolean).join(', ') || 'Aucune identifiée'}
+                                  </span>
+                                </div>
+                              )}
+
+                            {collaboration.predictionDetails.potential_risk?.message && (
+                              <div className="collab-detail-meta-row">
+                                <span className="collab-detail-meta-label">Vecteur de propagation</span>
+                                <span className="collab-detail-meta-val" style={{ fontSize: '13px' }}>
+                                  {collaboration.predictionDetails.potential_risk.message}
+                                </span>
+                              </div>
+                            )}
+
+                            {collaboration.predictionDetails.impact_tags && collaboration.predictionDetails.impact_tags.length > 0 && (
+                              <div className="collab-detail-meta-row">
+                                <span className="collab-detail-meta-label">Domaines d'impact</span>
+                                <div className="collab-detail-tag-list">
+                                  {collaboration.predictionDetails.impact_tags.map((tag, i) => (
+                                    <span key={i} className="collab-detail-tag">{tag}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="collab-detail-meta-val" style={{ color: 'var(--color-text-muted)', fontSize: '13px', fontStyle: 'italic' }}>
+                            Aucune prédiction IA disponible pour cet incident.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Subsection 3: Collaboration & Participation (Third Most Important) */}
+                      <div className="collab-detail-subsection">
+                        <h4 className="collab-detail-subsection-title">La Collaboration</h4>
+                        <div className="collab-detail-meta-group">
+                          {collaboration?.userRole && (
+                            <div className="collab-detail-meta-row">
+                              <span className="collab-detail-meta-label">Votre rôle</span>
+                              <span className="collab-detail-meta-val">
+                                <span className={`collab-detail-badge ${getRoleBadgeClass(collaboration.userRole)}`}>
+                                  {formatRole(collaboration.userRole)}
+                                </span>
+                              </span>
+                            </div>
+                          )}
+                          {collaboration?.organisation && (
+                            <div className="collab-detail-meta-row">
+                              <span className="collab-detail-meta-label">Organisation</span>
+                              <span className="collab-detail-meta-val" style={{ fontWeight: '500' }}>{collaboration.organisation}</span>
+                            </div>
+                          )}
+                          {collaboration?.userFullName && (
+                            <div className="collab-detail-meta-row">
+                              <span className="collab-detail-meta-label">Collaborateur</span>
+                              <span className="collab-detail-meta-val">
+                                {collaboration.userFullName} <span style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>({collaboration.userEmail})</span>
+                              </span>
+                            </div>
+                          )}
+                          {collaboration?.status && (
+                            <div className="collab-detail-meta-row">
+                              <span className="collab-detail-meta-label">Statut invitation</span>
+                              <span className="collab-detail-meta-val">
+                                <span className={`collab-detail-badge ${getStatusBadgeClass(collaboration.status)}`}>
+                                  {formatStatus(collaboration.status)}
+                                </span>
+                              </span>
+                            </div>
+                          )}
+                          {collaboration?.joinedAt && (
+                            <div className="collab-detail-meta-row">
+                              <span className="collab-detail-meta-label">Rejoint le</span>
+                              <span className="collab-detail-meta-val">{collaboration.joinedAt}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Bouton suggérer/inviter des organisations */}
+                      <div className="collab-detail-info-block" style={{ marginTop: 'var(--spacing-4)' }}>
                         <button
                           type="button"
                           className="collab-suggest-org-btn"
-                          onClick={() => setShowSuggestModal(true)}
+                          onClick={() => {
+                            setShowSuggestModal(true);
+                            setTimeout(() => setSuggestModalShowing(true), 10);
+                          }}
                         >
-                          <Crown1 size={18} variant="Bold" color="#fff" />
-                          <span>Suggérer des organi.</span>
+                          <span>
+                            {collaboration?.userRole === 'leader'
+                              ? 'Inviter des organisations'
+                              : 'Suggérer des organisations'}
+                          </span>
                         </button>
                       </div>
-                      {/* )} */}
                     </div>
                   </aside>
                 )}
@@ -1926,6 +2349,22 @@ export const CollaborationDetail = () => {
                                     <Add size={16} variant="Bold" color="#6C7278" />
                                   </button>
                                 )}
+
+                                {!isCollabClosed(collaboration?.id) && (
+                                  <button
+                                    type="button"
+                                    className="collab-task-delete-btn"
+                                    onClick={() => setTaskToDelete(task)}
+                                    disabled={deletingTaskIds.includes(task.id)}
+                                    title="Supprimer la tâche"
+                                  >
+                                    {deletingTaskIds.includes(task.id) ? (
+                                      <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" style={{ width: '12px', height: '12px', border: '2px solid transparent', borderTopColor: '#EF4444', borderRightColor: '#EF4444', borderRadius: '50%', animation: 'spin 0.75s linear infinite' }}></span>
+                                    ) : (
+                                      <Trash size={16} variant="Bold" color="#EF4444" />
+                                    )}
+                                  </button>
+                                )}
                               </div>
 
                               {(task.failed && (task.failure_reason || task.failureReason)) && (
@@ -2011,7 +2450,7 @@ export const CollaborationDetail = () => {
                                     Compléter la tâche avec une preuve
                                   </div>
                                   <p style={{ fontSize: 'var(--font-size-caption)', color: 'var(--color-text-secondary)', margin: '0 0 var(--spacing-3) 0' }}>
-                                    Sélectionnez une image ou une vidéo pour justifier de la réalisation de la tâche.
+                                    Sélectionnez une image, vidéo ou document (PDF, Word, Excel, etc.) pour justifier de la réalisation de la tâche.
                                   </p>
 
                                   {proofUploadError && (
@@ -2026,41 +2465,130 @@ export const CollaborationDetail = () => {
                                     </div>
                                   )}
 
-                                  {proofPreviewUrl && (
-                                    <div className="proof-file-preview-container" style={{ position: 'relative', marginTop: '8px', marginBottom: '12px', maxWidth: '200px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
+                                  {(proofPreviewUrl || selectedProofFile) && (
+                                    <div className="proof-file-preview-container" style={{ position: 'relative', marginTop: '8px', marginBottom: '12px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
                                       {proofPreviewType === 'image' ? (
-                                        <img src={proofPreviewUrl} alt="Preview" style={{ width: '100%', height: 'auto', display: 'block' }} />
+                                        <>
+                                          <img src={proofPreviewUrl} alt="Preview" style={{ width: '100%', height: 'auto', display: 'block', maxWidth: '200px' }} />
+                                          <button
+                                            type="button"
+                                            disabled={uploadingProofTask === task.id}
+                                            onClick={() => {
+                                              setSelectedProofFile(null);
+                                              setProofPreviewUrl(null);
+                                              setProofPreviewType(null);
+                                            }}
+                                            style={{
+                                              position: 'absolute',
+                                              top: '4px',
+                                              right: '4px',
+                                              backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                                              color: '#fff',
+                                              border: 'none',
+                                              borderRadius: '50%',
+                                              width: '24px',
+                                              height: '24px',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              cursor: 'pointer',
+                                              fontSize: '14px',
+                                              zIndex: 10
+                                            }}
+                                          >
+                                            ×
+                                          </button>
+                                        </>
+                                      ) : proofPreviewType === 'video' ? (
+                                        <>
+                                          <video src={proofPreviewUrl} controls style={{ width: '100%', display: 'block', maxWidth: '300px' }} />
+                                          <button
+                                            type="button"
+                                            disabled={uploadingProofTask === task.id}
+                                            onClick={() => {
+                                              setSelectedProofFile(null);
+                                              setProofPreviewUrl(null);
+                                              setProofPreviewType(null);
+                                            }}
+                                            style={{
+                                              position: 'absolute',
+                                              top: '4px',
+                                              right: '4px',
+                                              backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                                              color: '#fff',
+                                              border: 'none',
+                                              borderRadius: '50%',
+                                              width: '24px',
+                                              height: '24px',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              cursor: 'pointer',
+                                              fontSize: '14px',
+                                              zIndex: 10
+                                            }}
+                                          >
+                                            ×
+                                          </button>
+                                        </>
                                       ) : (
-                                        <video src={proofPreviewUrl} controls style={{ width: '100%', display: 'block' }} />
+                                        <div style={{ display: 'flex', alignItems: 'stretch', width: '100%' }}>
+                                          <div style={{
+                                            padding: 'var(--spacing-3)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 'var(--spacing-2)',
+                                            backgroundColor: 'var(--color-background)',
+                                            flex: 1,
+                                            minWidth: 0
+                                          }}>
+                                            <DocumentUpload size={28} variant="Bold" color="var(--color-primary)" style={{ flexShrink: 0 }} />
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                              <div style={{
+                                                fontSize: 'var(--font-size-body-small)',
+                                                fontWeight: 'var(--font-weight-semibold)',
+                                                color: 'var(--color-text-primary)',
+                                                wordBreak: 'break-word',
+                                                overflowWrap: 'break-word',
+                                                lineHeight: '1.4'
+                                              }}>
+                                                {selectedProofFile?.name}
+                                              </div>
+                                              <div style={{ fontSize: 'var(--font-size-caption)', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                                                {selectedProofFile?.size ? `${(selectedProofFile.size / 1024).toFixed(2)} KB` : ''}
+                                              </div>
+                                            </div>
+                                          </div>
+                                          <button
+                                            type="button"
+                                            disabled={uploadingProofTask === task.id}
+                                            onClick={() => {
+                                              setSelectedProofFile(null);
+                                              setProofPreviewUrl(null);
+                                              setProofPreviewType(null);
+                                            }}
+                                            style={{
+                                              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                              color: 'var(--color-danger)',
+                                              border: 'none',
+                                              borderLeft: '1px solid var(--color-border)',
+                                              padding: '0 var(--spacing-3)',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              cursor: 'pointer',
+                                              fontSize: '18px',
+                                              fontWeight: 'bold',
+                                              transition: 'background-color 0.2s ease',
+                                              minWidth: '40px'
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
+                                          >
+                                            ×
+                                          </button>
+                                        </div>
                                       )}
-                                      <button
-                                        type="button"
-                                        disabled={uploadingProofTask === task.id}
-                                        onClick={() => {
-                                          setSelectedProofFile(null);
-                                          setProofPreviewUrl(null);
-                                          setProofPreviewType(null);
-                                        }}
-                                        style={{
-                                          position: 'absolute',
-                                          top: '4px',
-                                          right: '4px',
-                                          backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                                          color: '#fff',
-                                          border: 'none',
-                                          borderRadius: '50%',
-                                          width: '20px',
-                                          height: '20px',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          cursor: 'pointer',
-                                          fontSize: '12px',
-                                          zIndex: 10
-                                        }}
-                                      >
-                                        ×
-                                      </button>
                                     </div>
                                   )}
 
@@ -2070,14 +2598,22 @@ export const CollaborationDetail = () => {
                                       <span>Choisir un fichier</span>
                                       <input
                                         type="file"
-                                        accept="image/*,video/*"
+                                        accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
                                         disabled={uploadingProofTask === task.id}
                                         onChange={(e) => {
                                           const file = e.target.files[0];
                                           if (file) {
                                             setSelectedProofFile(file);
-                                            setProofPreviewUrl(URL.createObjectURL(file));
-                                            setProofPreviewType(file.type.startsWith('image/') ? 'image' : 'video');
+                                            if (file.type.startsWith('image/')) {
+                                              setProofPreviewUrl(URL.createObjectURL(file));
+                                              setProofPreviewType('image');
+                                            } else if (file.type.startsWith('video/')) {
+                                              setProofPreviewUrl(URL.createObjectURL(file));
+                                              setProofPreviewType('video');
+                                            } else {
+                                              setProofPreviewUrl(null);
+                                              setProofPreviewType('document');
+                                            }
                                             setProofUploadError(null);
                                             setProofUploadSuccess(null);
                                           }
@@ -2174,26 +2710,31 @@ export const CollaborationDetail = () => {
                                       {expandedCompletedProofs.includes(task.id) && (
                                         <div
                                           className="collab-task-proof-display"
-                                          onClick={() => {
-                                            if (task.proof_image || (task.proof?.type === 'image' && task.proof.url)) {
-                                              setActiveProofPreview({ type: 'image', url: task.proof_image || task.proof.url });
-                                            } else if (task.proof_video || (task.proof?.type === 'video' && task.proof.url)) {
-                                              setActiveProofPreview({ type: 'video', url: task.proof_video || task.proof.url });
-                                            }
-                                          }}
                                           style={{
                                             borderRadius: 'var(--radius-md)',
                                             overflow: 'hidden',
                                             border: '1px solid var(--color-border)',
-                                            cursor: 'pointer',
                                             position: 'relative',
-                                            backgroundColor: '#000',
-                                            maxHeight: '400px',
                                             animation: 'fadeIn 0.25s ease-out'
                                           }}
                                         >
+                                          {/* Image */}
                                           {(task.proof_image || (task.proof?.type === 'image' && task.proof.url)) && (
-                                            <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }} className="proof-hover-container">
+                                            <div
+                                              onClick={() => {
+                                                setActiveProofPreview({ type: 'image', url: task.proof_image || task.proof.url });
+                                              }}
+                                              style={{
+                                                cursor: 'pointer',
+                                                backgroundColor: '#000',
+                                                maxHeight: '400px',
+                                                position: 'relative',
+                                                width: '100%',
+                                                height: '100%',
+                                                overflow: 'hidden'
+                                              }}
+                                              className="proof-hover-container"
+                                            >
                                               <img
                                                 src={task.proof_image || task.proof.url}
                                                 alt="Preuve"
@@ -2209,8 +2750,16 @@ export const CollaborationDetail = () => {
                                               </div>
                                             </div>
                                           )}
+
+                                          {/* Vidéo */}
                                           {(task.proof_video || (task.proof?.type === 'video' && task.proof.url)) && (
-                                            <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }} className="proof-hover-container">
+                                            <div
+                                              onClick={() => {
+                                                setActiveProofPreview({ type: 'video', url: task.proof_video || task.proof.url });
+                                              }}
+                                              style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', cursor: 'pointer' }}
+                                              className="proof-hover-container"
+                                            >
                                               <video
                                                 src={task.proof_video || task.proof.url}
                                                 className="collab-task-proof-video"
@@ -2234,6 +2783,39 @@ export const CollaborationDetail = () => {
                                               </div>
                                             </div>
                                           )}
+
+                                          {/* Document (PDF, Word, Excel, etc.) */}
+                                          {!task.proof_image && !task.proof_video && task.proof && (
+                                            <a
+                                              href={task.proof.url || task.proof}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              download
+                                              style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 'var(--spacing-3)',
+                                                padding: 'var(--spacing-4)',
+                                                backgroundColor: 'var(--color-background)',
+                                                textDecoration: 'none',
+                                                color: 'inherit',
+                                                transition: 'background-color 0.2s ease'
+                                              }}
+                                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(58, 162, 221, 0.05)'}
+                                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-background)'}
+                                            >
+                                              <DocumentUpload size={32} variant="Bold" color="var(--color-primary)" />
+                                              <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ fontSize: 'var(--font-size-body)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-primary)', marginBottom: 'var(--spacing-1)' }}>
+                                                  Document de preuve
+                                                </div>
+                                                <div style={{ fontSize: 'var(--font-size-caption)', color: 'var(--color-text-secondary)' }}>
+                                                  Cliquer pour ouvrir ou télécharger
+                                                </div>
+                                              </div>
+                                              <div style={{ fontSize: '20px', color: 'var(--color-primary)' }}>→</div>
+                                            </a>
+                                          )}
                                         </div>
                                       )}
                                     </>
@@ -2243,7 +2825,7 @@ export const CollaborationDetail = () => {
                                       Ajouter une preuve
                                       <input
                                         type="file"
-                                        accept="image/*,video/*"
+                                        accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
                                         onChange={(e) => {
                                           if (e.target.files[0]) {
                                             handleProofUpload(task.id, e.target.files[0]);
@@ -2296,6 +2878,20 @@ export const CollaborationDetail = () => {
 
               {/* Modal de suggestion d'organisations */}
               <SuggestOrgModal key="suggest-org" />
+
+              {/* Modal de confirmation de suppression de tâche */}
+              <DeleteTaskModal
+                isOpen={taskToDelete !== null}
+                onClose={() => setTaskToDelete(null)}
+                onConfirm={async () => {
+                  if (taskToDelete) {
+                    await deleteTask(taskToDelete.id);
+                    setTaskToDelete(null);
+                  }
+                }}
+                taskTitle={taskToDelete?.title || ''}
+                isDeleting={taskToDelete ? deletingTaskIds.includes(taskToDelete.id) : false}
+              />
 
               {/* Modal de prévisualisation de preuve en grand */}
               {activeProofPreview && (
@@ -2434,6 +3030,134 @@ export const CollaborationDetail = () => {
           </main>
         </div>
       </div>
+
+      {/* Modal de résolution d'incident */}
+      {showCloseModal && (
+        <>
+          <div
+            className={[
+              'am-offcanvas-backdrop',
+              !closeModalShowing ? 'am-offcanvas-backdrop--closing' : '',
+            ].filter(Boolean).join(' ')}
+            onClick={closeCloseModal}
+          />
+          <div
+            className={[
+              'am-offcanvas-panel',
+              !closeModalShowing ? 'am-offcanvas-panel--closing' : 'am-offcanvas-panel--opening',
+            ].filter(Boolean).join(' ')}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Résoudre l'incident"
+          >
+            <div className="am-offcanvas-header">
+              <h5 className="am-offcanvas-title">Résoudre l'incident</h5>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={closeCloseModal}
+                disabled={isClosing}
+              />
+            </div>
+
+            <div className="am-offcanvas-body">
+              {closeAlert && (
+                <div className="am-alert am-alert--danger" role="alert" style={{ marginBottom: 'var(--spacing-3)' }}>
+                  <span className="am-alert__message">{closeAlert.message}</span>
+                  <button
+                    type="button"
+                    className="am-alert__close"
+                    onClick={() => setCloseAlert(null)}
+                    aria-label="Close"
+                  >×</button>
+                </div>
+              )}
+
+              <p style={{ marginBottom: 'var(--spacing-4)', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-body)' }}>
+                Veuillez renseigner les dates de début et de fin de résolution de l'incident.
+              </p>
+
+              <div className="am-field">
+                <label className="am-label">
+                  Date de début de résolution *
+                </label>
+                <input
+                  type="date"
+                  className="am-input"
+                  value={resolutionStartDate}
+                  onChange={(e) => setResolutionStartDate(e.target.value)}
+                  disabled={isClosing}
+                />
+              </div>
+
+              <div className="am-field">
+                <label className="am-label">
+                  Date de fin de résolution *
+                </label>
+                <input
+                  type="date"
+                  className="am-input"
+                  value={resolutionEndDate}
+                  onChange={(e) => setResolutionEndDate(e.target.value)}
+                  disabled={isClosing}
+                />
+              </div>
+
+              <div className="am-field">
+                <label className="am-label">
+                  Document justificatif (Image, Vidéo, PDF, Word, Excel)
+                </label>
+                <input
+                  type="file"
+                  className="am-input"
+                  accept="image/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  onChange={(e) => setResolutionFile(e.target.files[0] || null)}
+                  disabled={isClosing}
+                />
+                {resolutionFile && (
+                  <div style={{ marginTop: 'var(--spacing-2)', fontSize: 'var(--font-size-body-small)', color: 'var(--color-text-secondary)' }}>
+                    Fichier sélectionné : <strong>{resolutionFile.name}</strong> ({Math.round(resolutionFile.size / 1024)} KB)
+                  </div>
+                )}
+              </div>
+
+              <div className='alert alert-info'>
+                <p style={{ margin: 0, color: 'var(--color-info)', fontSize: 'var(--font-size-body)', lineHeight: '1.5' }}>
+                  <strong>Attention :</strong> Cette action est irréversible. Une fois l'incident résolu, il ne pourra plus être modifié.
+                </p>
+              </div>
+            </div>
+
+            <div className="am-offcanvas-footer">
+              <button
+                type="button"
+                className="am-btn am-btn--secondary"
+                onClick={closeCloseModal}
+                disabled={isClosing}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                className="am-btn am-btn--primary"
+                onClick={handleCloseIncident}
+                disabled={isClosing || !resolutionStartDate || !resolutionEndDate}
+              >
+                {isClosing ? (
+                  <>
+                    <span className="am-spinner" aria-hidden="true" />
+                    Clôture en cours...
+                  </>
+                ) : (
+                  <>
+                    Resoudre cet incident
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </CollaborationDetailProvider>
   );
 };

@@ -6,7 +6,7 @@ import { SECTORS, TYPES, COUNTRIES } from '../data/organisations';
 const FormOrganisationModal = () => {
   const {
     formModal,
-    formClosing,
+    formAnimating,
     closeFormModal,
     modalAlert,
     form,
@@ -20,207 +20,224 @@ const FormOrganisationModal = () => {
 
   if (!formModal.open) return null;
 
+  const isClosing = formAnimating === 'closing';
+  const panelClass = [
+    'am-offcanvas-panel',
+    isClosing ? 'am-offcanvas-panel--closing' : '',
+    formAnimating === 'opening' ? 'am-offcanvas-panel--opening' : '',
+  ].filter(Boolean).join(' ');
+
+  const backdropClass = [
+    'am-offcanvas-backdrop',
+    isClosing ? 'am-offcanvas-backdrop--closing' : '',
+  ].filter(Boolean).join(' ');
+
   return (
-    <div className={`orgs-modal-overlay ${formClosing ? 'closing' : ''}`} onClick={closeFormModal}>
-      <div className={`orgs-modal ${formClosing ? 'closing' : ''}`} onClick={(e) => e.stopPropagation()}>
-        <div className="orgs-modal-header">
-          <h2 className="orgs-modal-title">
+    <>
+      <div className={backdropClass} onClick={closeFormModal} />
+      <div
+        className={panelClass}
+        role="dialog"
+        aria-modal="true"
+        aria-label={formModal.mode === 'create' ? 'Nouvelle organisation' : "Modifier l'organisation"}
+      >
+        <div className="am-offcanvas-header">
+          <h5 className="am-offcanvas-title">
             {formModal.mode === 'create' ? 'Nouvelle organisation' : 'Modifier l\'organisation'}
-          </h2>
-          <button className="orgs-modal-close" onClick={closeFormModal}>
-            <CloseCircle size={22} variant="Bold" color="var(--color-text-muted)" />
-          </button>
+          </h5>
+          <button
+            type="button"
+            className="btn-close"
+            onClick={closeFormModal}
+            disabled={isSubmitting || modalAlert.type === 'success'}
+            aria-label="Fermer"
+          />
         </div>
 
-        <div className="orgs-modal-body">
+        <div className="am-offcanvas-body">
           {modalAlert.message && (
-            <div className={`orgs-bootstrap-alert alert-${modalAlert.type}`}>
+            <div className={`am-alert am-alert--${modalAlert.type === 'success' ? 'success' : 'danger'}`}>
               {modalAlert.type === 'success' ? <TickCircle size={18} variant="Bold" /> : <CloseCircle size={18} variant="Bold" />}
-              <span>{modalAlert.message}</span>
+              <span className="am-alert__message">{modalAlert.message}</span>
             </div>
           )}
 
-          {/* Photo / Avatar */}
-          <div className="orgs-photo-section">
-            {/* Zone de prévisualisation cliquable */}
-            <label htmlFor="org-photo-input" className="orgs-photo-picker">
-              {form.logo_url ? (
-                <img src={form.logo_url} alt="Logo organisation" className="orgs-photo-preview" />
-              ) : (
-                <div className="orgs-avatar orgs-avatar-lg" style={{ backgroundColor: form.color }}>
-                  {(form.acronym || '?').slice(0, 2).toUpperCase()}
-                </div>
-              )}
-              <div className="orgs-photo-overlay">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                  <circle cx="12" cy="13" r="4" />
-                </svg>
-                <span>{form.logo_url ? 'Changer' : 'Ajouter une photo'}</span>
-              </div>
-              <input
-                id="org-photo-input"
-                type="file"
-                accept="image/*"
-                style={{ display: 'none' }}
-                onChange={handlePhotoChange}
-              />
-            </label>
-
-            {/* Infos & actions à droite */}
-            <div className="orgs-photo-info">
-              <p className="orgs-photo-hint">Logo de l'organisation</p>
-              <p className="orgs-photo-sub">JPG, PNG ou SVG · max 2 Mo</p>
-              <div className="orgs-photo-actions">
-                <label htmlFor="org-photo-input" className="orgs-photo-btn orgs-photo-btn-upload">
-                  Choisir une photo
+              {/* Photo / Avatar */}
+              <div className="orgs-photo-section">
+                {/* Zone de prévisualisation cliquable */}
+                <label htmlFor="org-photo-input" className="orgs-photo-picker">
+                  {form.logo_url ? (
+                    <img src={form.logo_url} alt="Logo organisation" className="orgs-photo-preview" />
+                  ) : (
+                    <div className="orgs-avatar orgs-avatar-lg" style={{ backgroundColor: form.color }}>
+                      {(form.acronym || '?').slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="orgs-photo-overlay">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                      <circle cx="12" cy="13" r="4" />
+                    </svg>
+                    <span>{form.logo_url ? 'Changer' : 'Ajouter une photo'}</span>
+                  </div>
+                  <input
+                    id="org-photo-input"
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={handlePhotoChange}
+                  />
                 </label>
-                {form.logo_url && (
-                  <button type="button" className="orgs-photo-btn orgs-photo-btn-remove" onClick={removePhoto}>
-                    Supprimer
-                  </button>
-                )}
+
+                {/* Infos & actions à droite */}
+                <div className="orgs-photo-info">
+                  <p className="orgs-photo-hint">Logo de l'organisation</p>
+                  <p className="orgs-photo-sub">JPG, PNG ou SVG · max 2 Mo</p>
+                  <div className="orgs-photo-actions">
+                    <label htmlFor="org-photo-input" className="orgs-photo-btn orgs-photo-btn-upload">
+                      Choisir une photo
+                    </label>
+                    {form.logo_url && (
+                      <button type="button" className="orgs-photo-btn orgs-photo-btn-remove" onClick={removePhoto}>
+                        Supprimer
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
-          <div className="orgs-form-grid">
-            {/* Nom */}
-            <div className="orgs-field">
-              <label>Nom complet *</label>
-              <input
-                type="text"
-                placeholder="Ex. Croix-Rouge Sénégalaise"
-                value={form.name}
-                onChange={(e) => setField('name', e.target.value)}
-                style={formErrors.name ? { borderColor: 'var(--color-danger)' } : {}}
-              />
-              {formErrors.name && (
-                <span style={{ fontSize: 'var(--font-size-caption)', color: 'var(--color-danger)' }}>{formErrors.name}</span>
-              )}
-            </div>
+              <div className="orgs-form-grid">
+                {/* Nom */}
+                <div className="orgs-field">
+                  <label>Nom complet *</label>
+                  <input
+                    type="text"
+                    placeholder="Ex. Croix-Rouge Sénégalaise"
+                    value={form.name}
+                    onChange={(e) => setField('name', e.target.value)}
+                    style={formErrors.name ? { borderColor: 'var(--color-danger)' } : {}}
+                  />
+                  {formErrors.name && (
+                    <span style={{ fontSize: 'var(--font-size-caption)', color: 'var(--color-danger)' }}>{formErrors.name}</span>
+                  )}
+                </div>
 
-            {/* Acronyme */}
-            <div className="orgs-field">
-              <label>Acronyme *</label>
-              <input
-                type="text"
-                placeholder="Ex. CRS"
-                value={form.acronym}
-                onChange={(e) => setField('acronym', e.target.value.toUpperCase())}
-                maxLength={6}
-                style={formErrors.acronym ? { borderColor: 'var(--color-danger)' } : {}}
-              />
-              {formErrors.acronym && (
-                <span style={{ fontSize: 'var(--font-size-caption)', color: 'var(--color-danger)' }}>{formErrors.acronym}</span>
-              )}
-            </div>
+                {/* Acronyme */}
+                <div className="orgs-field">
+                  <label>Acronyme </label>
+                  <input
+                    type="text"
+                    placeholder="Ex. CRS"
+                    value={form.acronym}
+                    onChange={(e) => setField('acronym', e.target.value.toUpperCase())}
+                    maxLength={6}
+                    style={formErrors.acronym ? { borderColor: 'var(--color-danger)' } : {}}
+                  />
+                  {formErrors.acronym && (
+                    <span style={{ fontSize: 'var(--font-size-caption)', color: 'var(--color-danger)' }}>{formErrors.acronym}</span>
+                  )}
+                </div>
 
-            {/* Secteur */}
-            <div className="orgs-field">
-              <label>Secteur d'activité *</label>
-              <select value={form.sector} onChange={(e) => setField('sector', e.target.value)} style={formErrors.sector ? { borderColor: 'var(--color-danger)' } : {}}>
-                <option value="">Sélectionner…</option>
-                {SECTORS.map((s) => <option key={s.en} value={s.en}>{s.fr}</option>)}
-              </select>
-              {formErrors.sector && (
-                <span style={{ fontSize: 'var(--font-size-caption)', color: 'var(--color-danger)' }}>{formErrors.sector}</span>
-              )}
-            </div>
+                {/* Secteur */}
+                <div className="orgs-field">
+                  <label>Secteur d'activité *</label>
+                  <select value={form.sector} onChange={(e) => setField('sector', e.target.value)} style={formErrors.sector ? { borderColor: 'var(--color-danger)' } : {}}>
+                    <option value="">Sélectionner…</option>
+                    {SECTORS.map((s) => <option key={s.en} value={s.en}>{s.fr}</option>)}
+                  </select>
+                  {formErrors.sector && (
+                    <span style={{ fontSize: 'var(--font-size-caption)', color: 'var(--color-danger)' }}>{formErrors.sector}</span>
+                  )}
+                </div>
 
-            {/* Type */}
-            <div className="orgs-field">
-              <label>Type *</label>
-              <select value={form.type} onChange={(e) => setField('type', e.target.value)} style={formErrors.type ? { borderColor: 'var(--color-danger)' } : {}}>
-                <option value="">Sélectionner…</option>
-                {TYPES.map((t) => <option key={t.en} value={t.en}>{t.fr}</option>)}
-              </select>
-              {formErrors.type && (
-                <span style={{ fontSize: 'var(--font-size-caption)', color: 'var(--color-danger)' }}>{formErrors.type}</span>
-              )}
-            </div>
+                {/* Type */}
+                <div className="orgs-field">
+                  <label>Type *</label>
+                  <select value={form.type} onChange={(e) => setField('type', e.target.value)} style={formErrors.type ? { borderColor: 'var(--color-danger)' } : {}}>
+                    <option value="">Sélectionner…</option>
+                    {TYPES.map((t) => <option key={t.en} value={t.en}>{t.fr}</option>)}
+                  </select>
+                  {formErrors.type && (
+                    <span style={{ fontSize: 'var(--font-size-caption)', color: 'var(--color-danger)' }}>{formErrors.type}</span>
+                  )}
+                </div>
 
-            {/* Pays */}
-            <div className="orgs-field">
-              <label>Pays *</label>
-              <select value={form.country} onChange={(e) => setField('country', e.target.value)} style={formErrors.country ? { borderColor: 'var(--color-danger)' } : {}}>
-                <option value="">Sélectionner…</option>
-                {COUNTRIES.map((c) => <option key={c.en} value={c.en}>{c.fr}</option>)}
-              </select>
-              {formErrors.country && (
-                <span style={{ fontSize: 'var(--font-size-caption)', color: 'var(--color-danger)' }}>{formErrors.country}</span>
-              )}
-            </div>
+                {/* Pays */}
+                <div className="orgs-field">
+                  <label>Pays *</label>
+                  <select value={form.country} onChange={(e) => setField('country', e.target.value)} style={formErrors.country ? { borderColor: 'var(--color-danger)' } : {}}>
+                    <option value="">Sélectionner…</option>
+                    {COUNTRIES.map((c) => <option key={c.en} value={c.en}>{c.fr}</option>)}
+                  </select>
+                  {formErrors.country && (
+                    <span style={{ fontSize: 'var(--font-size-caption)', color: 'var(--color-danger)' }}>{formErrors.country}</span>
+                  )}
+                </div>
 
-            {/* Ville */}
-            <div className="orgs-field">
-              <label>Ville</label>
-              <input type="text" placeholder="Ex. Dakar" value={form.city} onChange={(e) => setField('city', e.target.value)} />
-            </div>
+                {/* Email */}
+                <div className="orgs-field">
+                  <label>Email</label>
+                  <input
+                    type="email"
+                    placeholder="contact@org.ml"
+                    value={form.email}
+                    onChange={(e) => setField('email', e.target.value)}
+                    style={formErrors.email ? { borderColor: 'var(--color-danger)' } : {}}
+                  />
+                  {formErrors.email && (
+                    <span style={{ fontSize: 'var(--font-size-caption)', color: 'var(--color-danger)' }}>{formErrors.email}</span>
+                  )}
+                </div>
 
-            {/* Email */}
-            <div className="orgs-field">
-              <label>Email</label>
-              <input
-                type="email"
-                placeholder="contact@org.ml"
-                value={form.email}
-                onChange={(e) => setField('email', e.target.value)}
-                style={formErrors.email ? { borderColor: 'var(--color-danger)' } : {}}
-              />
-              {formErrors.email && (
-                <span style={{ fontSize: 'var(--font-size-caption)', color: 'var(--color-danger)' }}>{formErrors.email}</span>
-              )}
-            </div>
+                {/* Téléphone */}
+                <div className="orgs-field">
+                  <label>Téléphone</label>
+                  <input type="tel" placeholder="+223 00 00 00 00" value={form.phone} onChange={(e) => setField('phone', e.target.value)} />
+                </div>
 
-            {/* Téléphone */}
-            <div className="orgs-field">
-              <label>Téléphone</label>
-              <input type="tel" placeholder="+223 00 00 00 00" value={form.phone} onChange={(e) => setField('phone', e.target.value)} />
-            </div>
+                {/* Site web */}
+                <div className="orgs-field">
+                  <label>Site web</label>
+                  <input type="text" placeholder="https://www.organisation.org" value={form.website} onChange={(e) => setField('website', e.target.value)} />
+                </div>
 
-            {/* Site web */}
-            <div className="orgs-field">
-              <label>Site web</label>
-              <input type="text" placeholder="https://www.organisation.org" value={form.website} onChange={(e) => setField('website', e.target.value)} />
-            </div>
+                {/* Statut */}
+                <div className="orgs-field">
+                  <label>Statut</label>
+                  <select value={form.status} onChange={(e) => setField('status', e.target.value)}>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
 
-            {/* Statut */}
-            <div className="orgs-field">
-              <label>Statut</label>
-              <select value={form.status} onChange={(e) => setField('status', e.target.value)}>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
-
-            {/* Description */}
-            <div className="orgs-field full-width">
-              <label>Description</label>
-              <textarea
-                placeholder="Décrivez le mandat et les activités de cette organisation…"
-                value={form.description}
-                onChange={(e) => setField('description', e.target.value)}
-              />
-            </div>
-          </div>
+                {/* Description */}
+                <div className="orgs-field full-width">
+                  <label>Description</label>
+                  <textarea
+                    placeholder="Décrivez le mandat et les activités de cette organisation…"
+                    value={form.description}
+                    onChange={(e) => setField('description', e.target.value)}
+                  />
+                </div>
+              </div>
         </div>
 
-        <div className="orgs-modal-footer">
+        <div className="am-offcanvas-footer">
           <button
-            className="orgs-btn-cancel"
+            type="button"
+            className="am-btn am-btn--secondary"
             onClick={closeFormModal}
             disabled={isSubmitting || modalAlert.type === 'success'}
           >
             Annuler
           </button>
           <button
-            className="orgs-btn-save"
+            type="button"
+            className="am-btn am-btn--primary"
             onClick={handleSubmit}
             disabled={isSubmitting || modalAlert.type === 'success'}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
           >
-            {isSubmitting && <span className="orgs-spinner" />}
+            {isSubmitting && <span className="am-spinner" aria-hidden="true" />}
             {isSubmitting
               ? (formModal.mode === 'create' ? 'Création...' : 'Enregistrement...')
               : (modalAlert.type === 'success' ? 'Succès !' : (formModal.mode === 'create' ? 'Créer l\'organisation' : 'Enregistrer les modifications'))
@@ -228,7 +245,7 @@ const FormOrganisationModal = () => {
           </button>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

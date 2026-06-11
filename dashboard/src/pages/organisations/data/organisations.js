@@ -1,19 +1,31 @@
 
 export const SECTORS = [
-  { fr: 'Humanitaire', en: 'humanitarian' },
-  { fr: 'Coordination humanitaire', en: 'humanitarian_coordination' },
-  { fr: 'Développement', en: 'development' },
-  { fr: 'Protection de l\'enfance', en: 'child_protection' },
+  { fr: 'Environnement', en: 'environment' },
+  { fr: 'Assainissement', en: 'sanitation' },
+  { fr: 'Eau / WASH', en: 'water_wash' },
   { fr: 'Santé', en: 'health' },
-  { fr: 'Nutrition et sécurité alimentaire', en: 'nutrition_and_food_security' },
-  { fr: 'Développement et humanitaire', en: 'development_and_humanitarian' },
+  { fr: 'Sécurité alimentaire', en: 'food_security' },
+  { fr: 'Protection', en: 'protection' },
+  { fr: 'Humanitaire', en: 'humanitarian' },
+  { fr: 'Développement', en: 'development' },
+  { fr: 'Gouvernance', en: 'governance' },
+  { fr: 'Éducation', en: 'education' },
+  { fr: 'Technologie / Données', en: 'technology_data' },
+  { fr: 'Multisectoriel', en: 'multisectoral' },
+  { fr: 'Autre', en: 'other' },
 ];
 
 export const TYPES = [
   { fr: 'ONG', en: 'ngo' },
   { fr: 'Organisation internationale', en: 'international_organization' },
-  { fr: 'Gouvernementale', en: 'governmental' },
-  { fr: 'Société civile', en: 'civil_society' },
+  { fr: 'Agence UN', en: 'un_agency' },
+  { fr: 'Institution publique', en: 'public_institution' },
+  { fr: 'Collectivité territoriale', en: 'local_authority' },
+  { fr: 'Association / OSC', en: 'association_cso' },
+  { fr: 'Secteur privé', en: 'private_sector' },
+  { fr: 'Projet / Programme', en: 'project_programme' },
+  { fr: 'Structure communautaire', en: 'community_structure' },
+  { fr: 'Autre', en: 'other' },
 ];
 
 export const COUNTRIES = [
