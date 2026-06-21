@@ -194,15 +194,6 @@ export const MapContainer = ({ incidents = [], isLoading = false }) => {
     ? baseIncidents
     : (baseIncidents && Array.isArray(baseIncidents.results) ? baseIncidents.results : []);
 
-  console.log('[MAP] --- Début filtrage ---');
-  console.log('[MAP] ownershipFilter:', ownershipFilter);
-  console.log('[MAP] statusFilter:', statusFilter);
-  console.log('[MAP] currentUserId:', currentUserId);
-  console.log('[MAP] Prop incidents:', incidents);
-  console.log('[MAP] SWR orgIncidentsData:', orgIncidentsData);
-  console.log('[MAP] baseIncidents résolu:', baseIncidents);
-  console.log('[MAP] normalizedIncidents:', normalizedIncidents);
-
   const DEFAULT_MALI_LAT = 12.65; // Bamako
   const DEFAULT_MALI_LNG = -8.0;
 
@@ -234,12 +225,10 @@ export const MapContainer = ({ incidents = [], isLoading = false }) => {
   }).filter((inc) => {
     // 2. Filtre d'attribution (Tous vs Mes incidents)
     if (ownershipFilter === 'mine') {
-      let takenById = inc?.taken_by;
-
+      const takenById = inc?.taken_by;
       const takenBy = takenById !== undefined ? parseInt(takenById) : null;
       const me = parseInt(currentUserId);
       if (isNaN(takenBy) || isNaN(me) || takenBy !== me) {
-        console.log(`[MAP] Incident ID ${inc.id} ("${inc.title}") rejeté: Filtre 'mine' actif mais taken_by (${takenById} -> ${takenBy}) ne correspond pas à l'utilisateur actuel (${currentUserId} -> ${me})`);
         return false;
       }
     }
@@ -247,30 +236,19 @@ export const MapContainer = ({ incidents = [], isLoading = false }) => {
     // 3. Filtre de statut (Actifs vs Résolus)
     const isResolved = inc?.etat == 'resolved';
     if (statusFilter === 'active' && isResolved) {
-      console.log(`[MAP] Incident ID ${inc.id} ("${inc.title}") rejeté: Filtre 'active' mais l'état est 'resolved'`);
       return false;
     }
     if (statusFilter === 'resolved' && !isResolved) {
-      console.log(`[MAP] Incident ID ${inc.id} ("${inc.title}") rejeté: Filtre 'resolved' mais l'état est '${inc.etat}'`);
       return false;
     }
 
     // 4. Filtrer les incidents supprimés
     if (inc?.is_deleted || inc?.isDeleted) {
-      console.log(`[MAP] Incident ID ${inc.id} ("${inc.title}") rejeté: Incident marqué comme supprimé (is_deleted: ${inc.is_deleted}, isDeleted: ${inc.isDeleted})`);
       return false;
     }
 
-    if (inc._hasFallbackCoords) {
-      console.log(`[MAP] Incident ID ${inc.id} ("${inc.title}") ACCEPTE et affiché avec coordonnées par défaut du Mali : [${inc._lat}, ${inc._lng}]`);
-    } else {
-      console.log(`[MAP] Incident ID ${inc.id} ("${inc.title}") ACCEPTE et affiché avec coordonnées réelles : [${inc._lat}, ${inc._lng}]`);
-    }
     return true;
   });
-
-  console.log('[MAP] Nombre total d\'incidents affichés (validIncidents):', validIncidents.length);
-  console.log('[MAP] --- Fin filtrage ---');
 
   const openModal = (incident) => {
     setModalClosing(false);
