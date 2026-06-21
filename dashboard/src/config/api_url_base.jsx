@@ -1,1 +1,1 @@
-export const  API_URL_BASE = "https://api.map-action.com"
+export const  API_URL_BASE = import.meta.env.VITE_API_BASE || "https://api.map-action.com"
