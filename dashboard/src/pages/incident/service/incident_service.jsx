@@ -406,6 +406,27 @@ export const declareResolvedService = async (incidentId) => {
 };
 
 /**
+ * Désengage l'organisation leader d'un incident (Admin d'organisation, leader).
+ * Repasse « Déclaré » si seul, sinon le leadership est proposé aux contributeurs.
+ * @param {number} incidentId - ID de l'incident
+ */
+export const disengageIncidentService = async (incidentId) => {
+  try {
+    const axios = authService.createAuthenticatedAxios();
+    const response = await axios.post(
+      `${API_URL_BASE}/MapApi/${INCIDENTS_URL}/${incidentId}/disengage/`,
+      {}
+    );
+
+    console.log('[Incident] Désengagement effectué:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('[Incident] Erreur désengagement:', error.response?.status, error.response?.data);
+    throw error?.response?.data || error;
+  }
+};
+
+/**
  * Valide la résolution d'un incident (résolu définitif)
  * super_admin ; requiert etat `in_validation`
  * @param {number} incidentId - ID de l'incident
@@ -709,6 +730,7 @@ export default {
   prepareResolutionService,
   returnForCompletionService,
   declareResolvedService,
+  disengageIncidentService,
   validateResolutionService,
   rejectResolutionService,
   assignToOrganisationService,

@@ -9,7 +9,7 @@ import {
   ShimmerCircularImage,
   ShimmerButton
 } from 'react-shimmer-effects';
-import { takeInChargeIncidentService, getIncidentService, getIncidentPredictionService, togglePublicIncidentService, prepareResolutionService, returnForCompletionService, declareResolvedService, validateResolutionService, rejectResolutionService, assignToOrganisationService, acceptOrgAssignmentService, declineOrgAssignmentService, reportToAdminService } from '../../service/incident_service';
+import { takeInChargeIncidentService, getIncidentService, getIncidentPredictionService, togglePublicIncidentService, prepareResolutionService, returnForCompletionService, declareResolvedService, disengageIncidentService, validateResolutionService, rejectResolutionService, assignToOrganisationService, acceptOrgAssignmentService, declineOrgAssignmentService, reportToAdminService } from '../../service/incident_service';
 import { requestCollaborationService } from '../../service/collaboration_service';
 import { getIncidentChatHistoryService, sendIncidentChatMessageService } from '../../service/chat_service';
 import { suggestCollaborationPartnerService } from '../../../collaboration-detail/service/collab_detail_service';
@@ -50,7 +50,7 @@ import './dark-dashboard.css';
 import { getOrganisationsService, formatOrganisation } from '../../../organisations/service/organisation_service';
 import { IncidentDetailContext } from './IncidentDetailContext';
 import { InviteOrgModal } from './modal/InviteOrgModal';
-import { canActOnIncident, canPrepareResolution, canDeclareResolved, canValidateResolution, canAssignToOrg, isOrgAdmin, canReportToAdmin } from '../../../../utils/roleHelpers';
+import { canActOnIncident, canPrepareResolution, canDeclareResolved, canDisengage, canValidateResolution, canAssignToOrg, isOrgAdmin, canReportToAdmin } from '../../../../utils/roleHelpers';
 import { authService } from '../../../auth/services/authService';
 
 // Composant shimmer pour le détail d'incident
@@ -478,6 +478,11 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
 
   const handleDeclareResolved = () =>
     runResolutionAction(() => declareResolvedService(safeIncident.id), 'Incident déclaré résolu, en attente de validation.');
+
+  const handleDisengage = () => {
+    if (!window.confirm('Se désengager de cet incident ? Cette action libère votre prise en charge.')) return;
+    runResolutionAction(() => disengageIncidentService(safeIncident.id), 'Désengagement effectué.');
+  };
 
   const handleReturnForCompletion = () =>
     runResolutionAction(() => returnForCompletionService(safeIncident.id), 'Incident renvoyé pour complément.');
@@ -1315,6 +1320,7 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
             if (etat === 'taken_into_account') {
               if (canPrepareResolution()) addBtn('prepare', 'Préparer la résolution', handlePrepareResolution, 'var(--color-primary)', iconPrepare);
               if (canDeclareResolved()) addBtn('declare', 'Déclarer résolu', handleDeclareResolved, 'var(--color-success)', iconResolve);
+              if (canDisengage() && safeIncident.isOwner) addBtn('disengage', 'Se désengager', handleDisengage, 'var(--color-danger)', iconReject);
             } else if (etat === 'resolution_prepared') {
               if (canDeclareResolved()) addBtn('declare', 'Déclarer résolu', handleDeclareResolved, 'var(--color-success)', iconResolve);
               if (canDeclareResolved()) addBtn('return', 'Renvoyer pour complément', handleReturnForCompletion, 'var(--color-warning)', iconReturn);
