@@ -440,7 +440,10 @@ const getEtatLabel = (etat) => {
     declared: 'Déclaré',
     taken_into_account: 'Pris en compte',
     in_progress: 'En cours',
-    resolved: 'Résolu'
+    resolution_prepared: 'Résolution préparée',
+    in_validation: 'Résolu (en validation)',
+    resolved: 'Résolu',
+    resolved_definitive: 'Résolu (définitif)'
   };
   return labels[etat] || etat;
 };
@@ -455,7 +458,10 @@ const getEtatColor = (etat) => {
     declared: '#6C7278',      // gris
     taken_into_account: '#3AA2DD',  // bleu (primary)
     in_progress: '#F59E0B',   // orange (warning)
-    resolved: '#22C55E'       // vert (success)
+    resolution_prepared: '#8B5CF6',  // violet (dossier préparé, attente Admin)
+    in_validation: '#0EA5E9', // bleu clair (attente validation Super Admin)
+    resolved: '#22C55E',      // vert (success)
+    resolved_definitive: '#16A34A'  // vert foncé (validé définitivement)
   };
   return colors[etat] || '#6C7278';
 };

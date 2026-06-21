@@ -3,6 +3,7 @@ import { SearchNormal1, ArrowDown2 } from 'iconsax-react';
 import { ShimmerThumbnail, ShimmerTitle, ShimmerText, ShimmerCircularImage } from 'react-shimmer-effects';
 import { Eye, Edit2, Trash, UserAdd } from 'iconsax-react';
 import { useIncidentModalContext } from '../../modale/IncidentModalContext';
+import { canAssignToAgents, canDeleteIncident } from '../../../../utils/roleHelpers';
 import './incident-list.css';
 
 // Composant shimmer pour le chargement (version table)
@@ -46,6 +47,9 @@ export const IncidentList = ({ incidents = [], onSelectIncident, selectedId, isL
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const { openDeleteModal, openAssignModal } = useIncidentModalContext();
+  // Gating par rôle (matrice §6) : assigner = Admin orga, supprimer = Super Admin.
+  const showAssign = canAssignToAgents();
+  const showDelete = canDeleteIncident();
 
   const filtered = useMemo(() => {
     return incidents.filter((i) => {
@@ -182,22 +186,26 @@ export const IncidentList = ({ incidents = [], onSelectIncident, selectedId, isL
                       </td>
                       <td onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                          <button
-                            type="button"
-                            className="incident-action-btn assign-btn"
-                            onClick={() => openAssignModal(incident)}
-                            title="Assigner un agent"
-                          >
-                            <UserAdd size={16} variant="Bold" color="var(--color-primary)" />
-                          </button>
-                          <button
-                            type="button"
-                            className="incident-action-btn delete-btn"
-                            onClick={() => openDeleteModal(incident)}
-                            title="Supprimer l'incident"
-                          >
-                            <Trash size={16} variant="Bold" color="var(--color-danger)" />
-                          </button>
+                          {showAssign && (
+                            <button
+                              type="button"
+                              className="incident-action-btn assign-btn"
+                              onClick={() => openAssignModal(incident)}
+                              title="Assigner un agent"
+                            >
+                              <UserAdd size={16} variant="Bold" color="var(--color-primary)" />
+                            </button>
+                          )}
+                          {showDelete && (
+                            <button
+                              type="button"
+                              className="incident-action-btn delete-btn"
+                              onClick={() => openDeleteModal(incident)}
+                              title="Supprimer l'incident"
+                            >
+                              <Trash size={16} variant="Bold" color="var(--color-danger)" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

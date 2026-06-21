@@ -13,6 +13,7 @@ import { Agents } from './pages/agents';
 import { ImplicationPrivee } from './pages/implication-privee';
 import { ProtectedRoute } from './components/auth';
 import { authService } from './pages/auth/services/authService';
+import { SUPER_ADMIN } from './utils/roleHelpers';
 
 function App() {
   const [isAuthChecked, setIsAuthChecked] = useState(false);
@@ -112,7 +113,7 @@ function App() {
         <Route
           path="/trash"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={[SUPER_ADMIN]}>
               <TrashPage />
             </ProtectedRoute>
           }
@@ -121,7 +122,7 @@ function App() {
         <Route
           path="/organisations"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={[SUPER_ADMIN]}>
               <Organisations />
             </ProtectedRoute>
           }

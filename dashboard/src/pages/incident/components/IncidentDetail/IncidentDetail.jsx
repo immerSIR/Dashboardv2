@@ -50,6 +50,7 @@ import './dark-dashboard.css';
 import { getOrganisationsService, formatOrganisation } from '../../../organisations/service/organisation_service';
 import { IncidentDetailContext } from './IncidentDetailContext';
 import { InviteOrgModal } from './modal/InviteOrgModal';
+import { canActOnIncident } from '../../../../utils/roleHelpers';
 
 // Composant shimmer pour le détail d'incident
 const IncidentDetailSkeleton = () => (
@@ -1102,8 +1103,10 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
               </span>
             )}
 
-            {/* Bouton Prendre en compte / Inviter - Masqué si l'incident est géré en interne ou si l'utilisateur a déjà un rôle */}
-            {!(safeIncident?.take_in_charge_mode === 'internal' || safeIncident?.take_in_charge_mode === 'interne') && !hasParticipantRole && (
+            {/* Bouton Prendre en compte / Inviter - Réservé à l'Admin d'organisation (matrice §6 :
+                agir sur incident / inviter / collaborer). Masqué si l'incident est géré en interne
+                ou si l'utilisateur a déjà un rôle. */}
+            {canActOnIncident() && !(safeIncident?.take_in_charge_mode === 'internal' || safeIncident?.take_in_charge_mode === 'interne') && !hasParticipantRole && (
               <button
                 type="button"
                 className="detail-action-btn-custom"
