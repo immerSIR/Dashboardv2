@@ -9,7 +9,7 @@ import {
   ShimmerCircularImage,
   ShimmerButton
 } from 'react-shimmer-effects';
-import { takeInChargeIncidentService, getIncidentService, getIncidentPredictionService, togglePublicIncidentService, prepareResolutionService, returnForCompletionService, declareResolvedService, validateResolutionService, rejectResolutionService } from '../../service/incident_service';
+import { takeInChargeIncidentService, getIncidentService, getIncidentPredictionService, togglePublicIncidentService, prepareResolutionService, returnForCompletionService, declareResolvedService, validateResolutionService, rejectResolutionService, assignToOrganisationService, acceptOrgAssignmentService, declineOrgAssignmentService, reportToAdminService } from '../../service/incident_service';
 import { requestCollaborationService } from '../../service/collaboration_service';
 import { getIncidentChatHistoryService, sendIncidentChatMessageService } from '../../service/chat_service';
 import { suggestCollaborationPartnerService } from '../../../collaboration-detail/service/collab_detail_service';
@@ -50,7 +50,8 @@ import './dark-dashboard.css';
 import { getOrganisationsService, formatOrganisation } from '../../../organisations/service/organisation_service';
 import { IncidentDetailContext } from './IncidentDetailContext';
 import { InviteOrgModal } from './modal/InviteOrgModal';
-import { canActOnIncident, canPrepareResolution, canDeclareResolved, canValidateResolution } from '../../../../utils/roleHelpers';
+import { canActOnIncident, canPrepareResolution, canDeclareResolved, canValidateResolution, canAssignToOrg, isOrgAdmin, canReportToAdmin } from '../../../../utils/roleHelpers';
+import { authService } from '../../../auth/services/authService';
 
 // Composant shimmer pour le détail d'incident
 const IncidentDetailSkeleton = () => (
@@ -317,6 +318,10 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
   const [resolutionBusy, setResolutionBusy] = useState(false);
   const [resolutionFeedback, setResolutionFeedback] = useState(null); // { type, message }
 
+  // Assignation à une organisation (Super Admin) : ouverture du sélecteur + orga choisie
+  const [assignOrgOpen, setAssignOrgOpen] = useState(false);
+  const [selectedAssignOrgId, setSelectedAssignOrgId] = useState('');
+
   useEffect(() => {
     setImageLoaded(false);
   }, [safeIncident?.image]);
@@ -384,6 +389,29 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
 
   // Formater les organisations pour l'affichage
   const availableOrgs = rawOrganisations ? rawOrganisations?.map(formatOrganisation) : [];
+
+  // Organisations pour le sélecteur d'assignation (Super Admin) — chargées à l'ouverture du contrôle
+  const { data: rawAssignOrgs, isLoading: isLoadingAssignOrgs } = useSWR(
+    assignOrgOpen ? 'organisations-assign' : null,
+    getOrganisationsService,
+    { revalidateOnFocus: false, revalidateOnReconnect: false }
+  );
+  const assignOrgs = rawAssignOrgs ? rawAssignOrgs.map(formatOrganisation) : [];
+
+  // Assignations org de l'incident (exposées en lecture seule par IncidentGetSerializer)
+  const orgAssignments = Array.isArray(currentIncident?.org_assignments)
+    ? currentIncident.org_assignments
+    : [];
+  const pendingOrgAssignment = orgAssignments.find((a) => a?.status === 'pending') || null;
+  // Org de l'utilisateur connecté (org_admin) — utilisée pour cibler l'assignation à accepter/refuser
+  const currentUserOrgId = authService.getCurrentUser()?.organisation_member ?? null;
+  // L'assignation en attente concerne-t-elle l'organisation de l'Admin connecté ?
+  const myPendingOrgAssignment =
+    pendingOrgAssignment &&
+    currentUserOrgId != null &&
+    pendingOrgAssignment.organisation_id === currentUserOrgId
+      ? pendingOrgAssignment
+      : null;
 
 
   const audioRef = useRef(null);
@@ -465,6 +493,45 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
       return;
     }
     runResolutionAction(() => rejectResolutionService(safeIncident.id, motif.trim()), 'Résolution refusée.');
+  };
+
+  // ── Phase 4 : assignation org / accept-decline / signalement Admin ──
+
+  // Super Admin : assigner l'incident à l'organisation sélectionnée
+  const handleAssignToOrganisation = () => {
+    if (!selectedAssignOrgId) {
+      setResolutionFeedback({ type: 'danger', message: 'Veuillez sélectionner une organisation.' });
+      return;
+    }
+    runResolutionAction(
+      () => assignToOrganisationService(safeIncident.id, parseInt(selectedAssignOrgId, 10)),
+      "Incident assigné à l'organisation."
+    ).then(() => {
+      setAssignOrgOpen(false);
+      setSelectedAssignOrgId('');
+    });
+  };
+
+  // Org Admin : accepter une assignation org en attente
+  const handleAcceptOrgAssignment = (assignmentId) =>
+    runResolutionAction(() => acceptOrgAssignmentService(assignmentId), 'Assignation acceptée.');
+
+  // Org Admin : refuser une assignation org en attente (motif obligatoire)
+  const handleDeclineOrgAssignment = (assignmentId) => {
+    const motif = window.prompt('Motif du refus (obligatoire) :');
+    if (motif === null) return; // annulé
+    if (!motif.trim()) {
+      setResolutionFeedback({ type: 'danger', message: 'Le motif du refus est obligatoire.' });
+      return;
+    }
+    runResolutionAction(() => declineOrgAssignmentService(assignmentId, motif.trim()), 'Assignation refusée.');
+  };
+
+  // Bureau agent : signaler l'incident à son Admin (commentaire optionnel)
+  const handleReportToAdmin = () => {
+    const comment = window.prompt('Commentaire pour votre Admin (optionnel) :');
+    if (comment === null) return; // annulé
+    runResolutionAction(() => reportToAdminService(safeIncident.id, comment.trim()), 'Incident signalé à votre Admin.');
   };
 
   const handleSendMessage = async (e) => {
@@ -1295,6 +1362,130 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
                     {resolutionFeedback.message}
                   </div>
                 )}
+              </div>
+            );
+          })()}
+
+          {/* ── Phase 4 : assignation org (Super Admin) / accept-decline (Org Admin) / signalement (Bureau Agent) ── */}
+          {(() => {
+            const ctrlBtnStyle = {
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 16px',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: resolutionBusy ? 'not-allowed' : 'pointer',
+              opacity: resolutionBusy ? 0.6 : 1,
+              transition: 'all 0.2s ease',
+              whiteSpace: 'nowrap'
+            };
+
+            // Super Admin : assigner à une organisation (uniquement s'il n'y a pas déjà une assignation en attente)
+            const showAssignToOrg = canAssignToOrg() && !pendingOrgAssignment;
+            // Org Admin : assignation en attente ciblant son organisation
+            const showAcceptDecline = isOrgAdmin() && !!myPendingOrgAssignment;
+            // Bureau Agent : incident déclaré → signaler à l'Admin
+            const showReportToAdmin = canReportToAdmin() && safeIncident.etat === 'declared';
+
+            if (!showAssignToOrg && !showAcceptDecline && !showReportToAdmin) return null;
+
+            return (
+              <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                  {showAssignToOrg && !assignOrgOpen && (
+                    <button
+                      type="button"
+                      onClick={() => setAssignOrgOpen(true)}
+                      disabled={resolutionBusy}
+                      style={{ ...ctrlBtnStyle, backgroundColor: 'var(--color-primary)', color: 'var(--color-surface)' }}
+                    >
+                      <Buildings2 size={18} variant="Bold" color="var(--color-surface)" />
+                      Assigner à une organisation
+                    </button>
+                  )}
+
+                  {showAssignToOrg && assignOrgOpen && (
+                    <>
+                      <select
+                        value={selectedAssignOrgId}
+                        onChange={(e) => setSelectedAssignOrgId(e.target.value)}
+                        disabled={resolutionBusy || isLoadingAssignOrgs}
+                        style={{
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--color-border)',
+                          backgroundColor: 'var(--color-surface)',
+                          color: 'var(--color-text-primary)',
+                          fontSize: '14px',
+                          minWidth: '220px'
+                        }}
+                      >
+                        <option value="">
+                          {isLoadingAssignOrgs ? 'Chargement…' : '— Sélectionner une organisation —'}
+                        </option>
+                        {assignOrgs.map((org) => (
+                          <option key={org.id} value={org.id}>{org.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={handleAssignToOrganisation}
+                        disabled={resolutionBusy || !selectedAssignOrgId}
+                        style={{ ...ctrlBtnStyle, backgroundColor: 'var(--color-success)', color: 'var(--color-surface)' }}
+                      >
+                        <TickCircle size={18} variant="Bold" color="var(--color-surface)" />
+                        Confirmer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setAssignOrgOpen(false); setSelectedAssignOrgId(''); }}
+                        disabled={resolutionBusy}
+                        style={{ ...ctrlBtnStyle, backgroundColor: 'var(--color-text-secondary)', color: 'var(--color-surface)' }}
+                      >
+                        <CloseCircle size={18} variant="Bold" color="var(--color-surface)" />
+                        Annuler
+                      </button>
+                    </>
+                  )}
+
+                  {showAcceptDecline && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleAcceptOrgAssignment(myPendingOrgAssignment.id)}
+                        disabled={resolutionBusy}
+                        style={{ ...ctrlBtnStyle, backgroundColor: 'var(--color-success)', color: 'var(--color-surface)' }}
+                      >
+                        <TickCircle size={18} variant="Bold" color="var(--color-surface)" />
+                        Accepter l'assignation
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeclineOrgAssignment(myPendingOrgAssignment.id)}
+                        disabled={resolutionBusy}
+                        style={{ ...ctrlBtnStyle, backgroundColor: 'var(--color-danger)', color: 'var(--color-surface)' }}
+                      >
+                        <CloseCircle size={18} variant="Bold" color="var(--color-surface)" />
+                        Refuser
+                      </button>
+                    </>
+                  )}
+
+                  {showReportToAdmin && (
+                    <button
+                      type="button"
+                      onClick={handleReportToAdmin}
+                      disabled={resolutionBusy}
+                      style={{ ...ctrlBtnStyle, backgroundColor: 'var(--color-warning)', color: 'var(--color-surface)' }}
+                    >
+                      <Danger size={18} variant="Bold" color="var(--color-surface)" />
+                      Signaler à mon Admin
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })()}

@@ -451,6 +451,120 @@ export const rejectResolutionService = async (incidentId, motif) => {
 };
 
 /**
+ * Assigne un incident à une organisation (Super Admin)
+ * super_admin ; crée une assignation org en attente (acceptation/refus par l'Admin de l'orga)
+ * @param {number} incidentId - ID de l'incident
+ * @param {number} organisationId - ID de l'organisation cible
+ * @returns {Promise<Object>} Assignation créée
+ */
+export const assignToOrganisationService = async (incidentId, organisationId) => {
+  try {
+    const axios = authService.createAuthenticatedAxios();
+    const response = await axios.post(
+      `${API_URL_BASE}/MapApi/${INCIDENTS_URL}/${incidentId}/assign-to-organisation/`,
+      { organisation_id: organisationId }
+    );
+
+    console.log('[Incident] Incident assigné à l\'organisation:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('[Incident] Erreur assignation à l\'organisation:', error.response?.status, error.response?.data);
+    throw error?.response?.data || error;
+  }
+};
+
+/**
+ * Accepte une assignation d'incident à une organisation
+ * org_admin (doit posséder l'organisation cible)
+ * @param {number} assignmentId - ID de l'assignation org
+ * @returns {Promise<Object>} Assignation mise à jour
+ */
+export const acceptOrgAssignmentService = async (assignmentId) => {
+  try {
+    const axios = authService.createAuthenticatedAxios();
+    const response = await axios.post(
+      `${API_URL_BASE}/MapApi/incident-org-assignments/${assignmentId}/accept/`,
+      {}
+    );
+
+    console.log('[Incident] Assignation org acceptée:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('[Incident] Erreur acceptation assignation org:', error.response?.status, error.response?.data);
+    throw error?.response?.data || error;
+  }
+};
+
+/**
+ * Refuse une assignation d'incident à une organisation (motif requis)
+ * org_admin (doit posséder l'organisation cible)
+ * @param {number} assignmentId - ID de l'assignation org
+ * @param {string} motif - Motif du refus
+ * @returns {Promise<Object>} Assignation mise à jour
+ */
+export const declineOrgAssignmentService = async (assignmentId, motif) => {
+  try {
+    const axios = authService.createAuthenticatedAxios();
+    const response = await axios.post(
+      `${API_URL_BASE}/MapApi/incident-org-assignments/${assignmentId}/decline/`,
+      { motif }
+    );
+
+    console.log('[Incident] Assignation org refusée:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('[Incident] Erreur refus assignation org:', error.response?.status, error.response?.data);
+    throw error?.response?.data || error;
+  }
+};
+
+/**
+ * Signale un incident à l'Admin (depuis le terrain)
+ * bureau_agent ; requiert etat `declared`
+ * @param {number} incidentId - ID de l'incident
+ * @param {string} comment - Commentaire (optionnel)
+ * @returns {Promise<Object>} Réponse du backend
+ */
+export const reportToAdminService = async (incidentId, comment) => {
+  try {
+    const axios = authService.createAuthenticatedAxios();
+    const response = await axios.post(
+      `${API_URL_BASE}/MapApi/${INCIDENTS_URL}/${incidentId}/report-to-admin/`,
+      { comment: comment || '' }
+    );
+
+    console.log('[Incident] Incident signalé à l\'Admin:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('[Incident] Erreur signalement à l\'Admin:', error.response?.status, error.response?.data);
+    throw error?.response?.data || error;
+  }
+};
+
+/**
+ * Relance une tâche échouée (la repasse en attente)
+ * leader de l'incident ; requiert une tâche en état `failed`
+ * @param {number} incidentId - ID de l'incident
+ * @param {number} taskId - ID de la tâche
+ * @returns {Promise<Object>} Tâche mise à jour
+ */
+export const relaunchTaskService = async (incidentId, taskId) => {
+  try {
+    const axios = authService.createAuthenticatedAxios();
+    const response = await axios.post(
+      `${API_URL_BASE}/MapApi/${INCIDENTS_URL}/${incidentId}/tasks/${taskId}/relaunch/`,
+      {}
+    );
+
+    console.log('[Incident] Tâche relancée:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('[Incident] Erreur relance tâche:', error.response?.status, error.response?.data);
+    throw error?.response?.data || error;
+  }
+};
+
+/**
  * Récupère les incidents supprimés (corbeille)
  * @returns {Promise<Array>} Liste des incidents supprimés
  */
@@ -597,6 +711,11 @@ export default {
   declareResolvedService,
   validateResolutionService,
   rejectResolutionService,
+  assignToOrganisationService,
+  acceptOrgAssignmentService,
+  declineOrgAssignmentService,
+  reportToAdminService,
+  relaunchTaskService,
   getTrashIncidentsService,
   restoreIncidentService,
   formatIncident

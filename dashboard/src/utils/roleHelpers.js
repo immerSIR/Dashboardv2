@@ -41,6 +41,7 @@ export const canActOnIncident = (role = getUserRole()) => role === ORG_ADMIN;
 export const canDeclareResolved = (role = getUserRole()) => role === ORG_ADMIN;
 export const canValidateResolution = (role = getUserRole()) => role === SUPER_ADMIN;
 export const canAssignToOrg = (role = getUserRole()) => role === SUPER_ADMIN;
+export const canReportToAdmin = (role = getUserRole()) => role === BUREAU_AGENT;
 export const canAssignToAgents = (role = getUserRole()) => role === ORG_ADMIN;
 export const canDeleteIncident = (role = getUserRole()) => role === SUPER_ADMIN;
 export const canManageOrganisations = (role = getUserRole()) => role === SUPER_ADMIN;
@@ -67,6 +68,7 @@ export default {
   canDeclareResolved,
   canValidateResolution,
   canAssignToOrg,
+  canReportToAdmin,
   canAssignToAgents,
   canDeleteIncident,
   canManageOrganisations,

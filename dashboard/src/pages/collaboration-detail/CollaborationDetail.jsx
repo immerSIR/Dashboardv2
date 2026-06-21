@@ -24,7 +24,7 @@ import {
   deleteTaskService,
   updateTaskService
 } from '../incident/service/task_service';
-import { closeIncidentService } from '../incident/service/incident_service';
+import { closeIncidentService, relaunchTaskService } from '../incident/service/incident_service';
 import {
   ArrowLeft2,
   Location,
@@ -882,6 +882,16 @@ export const CollaborationDetail = () => {
       await mutateTasks();
     } catch (err) {
       console.error('[resetTaskStatus] Erreur:', err);
+    }
+  };
+
+  // Relancer une tâche échouée (leader de l'incident) : failed → pending
+  const relaunchTask = async (taskId) => {
+    try {
+      await relaunchTaskService(incidentId, taskId);
+      await mutateTasks();
+    } catch (err) {
+      console.error('[relaunchTask] Erreur:', err);
     }
   };
 
@@ -2347,6 +2357,20 @@ export const CollaborationDetail = () => {
                                     title="Réinitialiser"
                                   >
                                     <Add size={16} variant="Bold" color="#6C7278" />
+                                  </button>
+                                )}
+
+                                {/* Relancer une tâche échouée — réservé au leader de l'incident
+                                    (failed → pending). Gate via collaboration.userRole === 'leader',
+                                    la notion existante du rôle de l'utilisateur sur cet incident. */}
+                                {task.failed && collaboration?.userRole === 'leader' && !isCollabClosed(collaboration?.id) && (
+                                  <button
+                                    type="button"
+                                    className="collab-task-reset-btn"
+                                    onClick={() => relaunchTask(task.id)}
+                                    title="Relancer la tâche"
+                                  >
+                                    <Refresh size={16} variant="Bold" color="var(--color-primary)" />
                                   </button>
                                 )}
 
