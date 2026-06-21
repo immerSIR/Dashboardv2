@@ -9,7 +9,7 @@ import {
   ShimmerCircularImage,
   ShimmerButton
 } from 'react-shimmer-effects';
-import { takeInChargeIncidentService, getIncidentService, getIncidentPredictionService, togglePublicIncidentService } from '../../service/incident_service';
+import { takeInChargeIncidentService, getIncidentService, getIncidentPredictionService, togglePublicIncidentService, prepareResolutionService, returnForCompletionService, declareResolvedService, validateResolutionService, rejectResolutionService } from '../../service/incident_service';
 import { requestCollaborationService } from '../../service/collaboration_service';
 import { getIncidentChatHistoryService, sendIncidentChatMessageService } from '../../service/chat_service';
 import { suggestCollaborationPartnerService } from '../../../collaboration-detail/service/collab_detail_service';
@@ -50,7 +50,7 @@ import './dark-dashboard.css';
 import { getOrganisationsService, formatOrganisation } from '../../../organisations/service/organisation_service';
 import { IncidentDetailContext } from './IncidentDetailContext';
 import { InviteOrgModal } from './modal/InviteOrgModal';
-import { canActOnIncident } from '../../../../utils/roleHelpers';
+import { canActOnIncident, canPrepareResolution, canDeclareResolved, canValidateResolution } from '../../../../utils/roleHelpers';
 
 // Composant shimmer pour le détail d'incident
 const IncidentDetailSkeleton = () => (
@@ -313,6 +313,10 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
   const [isTyping, setIsTyping] = useState(false);
   const chatMessagesEndRef = useRef(null);
 
+  // Flux de résolution (préparer / déclarer résolu / valider / refuser)
+  const [resolutionBusy, setResolutionBusy] = useState(false);
+  const [resolutionFeedback, setResolutionFeedback] = useState(null); // { type, message }
+
   useEffect(() => {
     setImageLoaded(false);
   }, [safeIncident?.image]);
@@ -414,6 +418,53 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
   const handleRefresh = () => {
     setLoadingTimeout(false);
     mutate();
+  };
+
+  // Exécute une action du flux de résolution puis rafraîchit l'incident (SWR mutate)
+  const runResolutionAction = async (action, successMessage) => {
+    if (resolutionBusy) return;
+    setResolutionBusy(true);
+    setResolutionFeedback(null);
+    try {
+      await action();
+      await mutate();
+      setResolutionFeedback({ type: 'success', message: successMessage });
+    } catch (error) {
+      console.error('[Incident] Erreur action résolution:', error);
+      const status = error?.response?.status;
+      let message = error?.detail || error?.message || error?.response?.data?.detail || error?.response?.data?.message;
+      if (!message) {
+        if (status === 403) message = "Vous n'avez pas la permission d'effectuer cette action.";
+        else if (status === 400) message = "Action impossible dans l'état actuel de l'incident.";
+        else if (status === 404) message = 'Incident non trouvé.';
+        else message = 'Une erreur est survenue. Veuillez réessayer.';
+      }
+      setResolutionFeedback({ type: 'danger', message });
+    } finally {
+      setResolutionBusy(false);
+    }
+  };
+
+  const handlePrepareResolution = () =>
+    runResolutionAction(() => prepareResolutionService(safeIncident.id), 'Dossier de résolution préparé.');
+
+  const handleDeclareResolved = () =>
+    runResolutionAction(() => declareResolvedService(safeIncident.id), 'Incident déclaré résolu, en attente de validation.');
+
+  const handleReturnForCompletion = () =>
+    runResolutionAction(() => returnForCompletionService(safeIncident.id), 'Incident renvoyé pour complément.');
+
+  const handleValidateResolution = () =>
+    runResolutionAction(() => validateResolutionService(safeIncident.id), 'Résolution validée définitivement.');
+
+  const handleRejectResolution = () => {
+    const motif = window.prompt('Motif du refus (obligatoire) :');
+    if (motif === null) return; // annulé
+    if (!motif.trim()) {
+      setResolutionFeedback({ type: 'danger', message: 'Le motif du refus est obligatoire.' });
+      return;
+    }
+    runResolutionAction(() => rejectResolutionService(safeIncident.id, motif.trim()), 'Résolution refusée.');
   };
 
   const handleSendMessage = async (e) => {
@@ -1154,6 +1205,99 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
               <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>ID #{safeIncident.id}</span>
             </div>
           </div>
+
+          {/* ── Flux de résolution : actions gated par rôle + état ── */}
+          {(() => {
+            const etat = safeIncident.etat;
+            const buttons = [];
+
+            const baseBtnStyle = {
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 16px',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: resolutionBusy ? 'not-allowed' : 'pointer',
+              opacity: resolutionBusy ? 0.6 : 1,
+              transition: 'all 0.2s ease',
+              whiteSpace: 'nowrap'
+            };
+
+            const addBtn = (key, label, onClick, color, icon) => buttons.push(
+              <button
+                key={key}
+                type="button"
+                onClick={onClick}
+                disabled={resolutionBusy}
+                style={{ ...baseBtnStyle, backgroundColor: color, color: 'var(--color-surface)' }}
+              >
+                {icon}
+                {label}
+              </button>
+            );
+
+            const iconPrepare = <ClipboardTick size={18} variant="Bold" color="var(--color-surface)" />;
+            const iconResolve = <ShieldTick size={18} variant="Bold" color="var(--color-surface)" />;
+            const iconReturn = <ArrowLeft2 size={18} variant="Bold" color="var(--color-surface)" />;
+            const iconValidate = <TickCircle size={18} variant="Bold" color="var(--color-surface)" />;
+            const iconReject = <CloseCircle size={18} variant="Bold" color="var(--color-surface)" />;
+
+            if (etat === 'taken_into_account') {
+              if (canPrepareResolution()) addBtn('prepare', 'Préparer la résolution', handlePrepareResolution, 'var(--color-primary)', iconPrepare);
+              if (canDeclareResolved()) addBtn('declare', 'Déclarer résolu', handleDeclareResolved, 'var(--color-success)', iconResolve);
+            } else if (etat === 'resolution_prepared') {
+              if (canDeclareResolved()) addBtn('declare', 'Déclarer résolu', handleDeclareResolved, 'var(--color-success)', iconResolve);
+              if (canDeclareResolved()) addBtn('return', 'Renvoyer pour complément', handleReturnForCompletion, 'var(--color-warning)', iconReturn);
+            } else if (etat === 'in_validation') {
+              if (canValidateResolution()) {
+                addBtn('validate', 'Valider la résolution', handleValidateResolution, 'var(--color-success)', iconValidate);
+                addBtn('reject', 'Refuser', handleRejectResolution, 'var(--color-danger)', iconReject);
+              }
+            }
+
+            // Note de statut lecture seule pour que tous les rôles voient l'état
+            const statusNote = etat === 'in_validation'
+              ? 'Résolution déclarée — en attente de validation par le Super Admin.'
+              : etat === 'resolved_definitive'
+                ? 'Résolution validée définitivement.'
+                : null;
+
+            if (buttons.length === 0 && !statusNote && !resolutionFeedback) return null;
+
+            return (
+              <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {buttons.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {buttons}
+                  </div>
+                )}
+                {statusNote && (
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '13px',
+                    color: 'var(--color-text-secondary)'
+                  }}>
+                    <ShieldTick size={16} variant="Bold" color="var(--color-text-secondary)" />
+                    {statusNote}
+                  </div>
+                )}
+                {resolutionFeedback && (
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: resolutionFeedback.type === 'success' ? 'var(--color-success)' : 'var(--color-danger)'
+                  }}>
+                    {resolutionFeedback.message}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         <div className="incident-dark-dashboard">

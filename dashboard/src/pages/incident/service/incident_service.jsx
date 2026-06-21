@@ -340,6 +340,117 @@ export const closeIncidentService = async (incidentId, data) => {
 };
 
 /**
+ * Prépare la résolution d'un incident (constitue le dossier de résolution)
+ * org_admin OU bureau_agent ; requiert etat `taken_into_account`
+ * @param {number} incidentId - ID de l'incident
+ * @returns {Promise<Object>} Incident mis à jour
+ */
+export const prepareResolutionService = async (incidentId) => {
+  try {
+    const axios = authService.createAuthenticatedAxios();
+    const response = await axios.post(
+      `${API_URL_BASE}/MapApi/${INCIDENTS_URL}/${incidentId}/prepare-resolution/`,
+      {}
+    );
+
+    console.log('[Incident] Résolution préparée:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('[Incident] Erreur préparation résolution:', error.response?.status, error.response?.data);
+    throw error?.response?.data || error;
+  }
+};
+
+/**
+ * Renvoie un incident pour complément (depuis le dossier de résolution préparé)
+ * org_admin ; requiert etat `resolution_prepared`
+ * @param {number} incidentId - ID de l'incident
+ * @returns {Promise<Object>} Incident mis à jour
+ */
+export const returnForCompletionService = async (incidentId) => {
+  try {
+    const axios = authService.createAuthenticatedAxios();
+    const response = await axios.post(
+      `${API_URL_BASE}/MapApi/${INCIDENTS_URL}/${incidentId}/return-for-completion/`,
+      {}
+    );
+
+    console.log('[Incident] Incident renvoyé pour complément:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('[Incident] Erreur renvoi pour complément:', error.response?.status, error.response?.data);
+    throw error?.response?.data || error;
+  }
+};
+
+/**
+ * Déclare un incident comme résolu (passe en validation)
+ * org_admin ; requiert etat `taken_into_account` ou `resolution_prepared`
+ * @param {number} incidentId - ID de l'incident
+ * @returns {Promise<Object>} Incident mis à jour
+ */
+export const declareResolvedService = async (incidentId) => {
+  try {
+    const axios = authService.createAuthenticatedAxios();
+    const response = await axios.post(
+      `${API_URL_BASE}/MapApi/${INCIDENTS_URL}/${incidentId}/declare-resolved/`,
+      {}
+    );
+
+    console.log('[Incident] Incident déclaré résolu:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('[Incident] Erreur déclaration résolu:', error.response?.status, error.response?.data);
+    throw error?.response?.data || error;
+  }
+};
+
+/**
+ * Valide la résolution d'un incident (résolu définitif)
+ * super_admin ; requiert etat `in_validation`
+ * @param {number} incidentId - ID de l'incident
+ * @returns {Promise<Object>} Incident mis à jour
+ */
+export const validateResolutionService = async (incidentId) => {
+  try {
+    const axios = authService.createAuthenticatedAxios();
+    const response = await axios.post(
+      `${API_URL_BASE}/MapApi/${INCIDENTS_URL}/${incidentId}/validate-resolution/`,
+      {}
+    );
+
+    console.log('[Incident] Résolution validée:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('[Incident] Erreur validation résolution:', error.response?.status, error.response?.data);
+    throw error?.response?.data || error;
+  }
+};
+
+/**
+ * Refuse la résolution d'un incident (motif requis)
+ * super_admin ; requiert etat `in_validation`
+ * @param {number} incidentId - ID de l'incident
+ * @param {string} motif - Motif du refus (requis)
+ * @returns {Promise<Object>} Incident mis à jour
+ */
+export const rejectResolutionService = async (incidentId, motif) => {
+  try {
+    const axios = authService.createAuthenticatedAxios();
+    const response = await axios.post(
+      `${API_URL_BASE}/MapApi/${INCIDENTS_URL}/${incidentId}/reject-resolution/`,
+      { motif }
+    );
+
+    console.log('[Incident] Résolution refusée:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('[Incident] Erreur refus résolution:', error.response?.status, error.response?.data);
+    throw error?.response?.data || error;
+  }
+};
+
+/**
  * Récupère les incidents supprimés (corbeille)
  * @returns {Promise<Array>} Liste des incidents supprimés
  */
@@ -481,6 +592,11 @@ export default {
   assignIncidentToAgentService,
   takeInChargeIncidentService,
   closeIncidentService,
+  prepareResolutionService,
+  returnForCompletionService,
+  declareResolvedService,
+  validateResolutionService,
+  rejectResolutionService,
   getTrashIncidentsService,
   restoreIncidentService,
   formatIncident
