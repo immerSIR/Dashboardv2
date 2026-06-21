@@ -2,131 +2,65 @@ import React from 'react';
 import { TickCircle, Danger, People, DocumentText, Camera, Warning2, InfoCircle, MessageText, Task, Archive } from 'iconsax-react';
 import './activity-panel.css';
 
-export const ActivityPanel = () => {
+// Map l'état d'un incident vers un type d'activité (icône), une sévérité (couleur)
+// et un libellé d'action.
+const ETAT_MAP = {
+  declared:            { type: 'alert',            severity: 'danger',  action: 'a été signalé' },
+  taken_into_account:  { type: 'incident-taken',   severity: 'info',    action: 'a été pris en compte' },
+  resolution_prepared: { type: 'task',             severity: 'warning', action: 'résolution en préparation' },
+  in_validation:       { type: 'info',             severity: 'warning', action: 'en attente de validation' },
+  resolved:            { type: 'incident-resolved', severity: 'success', action: 'a été résolu' },
+  resolved_definitive: { type: 'incident-resolved', severity: 'success', action: 'résolu définitivement' },
+};
+
+// Temps relatif en français à partir d'une date ISO
+const timeAgo = (dateStr) => {
+  if (!dateStr) return '';
+  const min = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+  if (min < 1) return "À l'instant";
+  if (min < 60) return `Il y a ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `Il y a ${h}h`;
+  return `Il y a ${Math.floor(h / 24)}j`;
+};
+
+export const ActivityPanel = ({ activity, isLoading = false }) => {
   // Fonction pour obtenir l'icône selon le type d'activité
-  const getActivityIcon = (type, severity) => {
+  const getActivityIcon = (type) => {
     const iconProps = { size: 20, variant: "Bold" };
-    
-    switch(type) {
-      case 'incident-taken':
-        return <DocumentText {...iconProps} color="#3AA2DD" />;
-      case 'incident-resolved':
-        return <TickCircle {...iconProps} color="#22C55E" />;
-      case 'collaboration':
-        return <People {...iconProps} color="#F59E0B" />;
-      case 'report':
-        return <Camera {...iconProps} color="#3AA2DD" />;
-      case 'alert':
-        return <Danger {...iconProps} color="#EF4444" />;
-      case 'warning':
-        return <Warning2 {...iconProps} color="#F59E0B" />;
-      case 'info':
-        return <InfoCircle {...iconProps} color="#6C7278" />;
-      case 'message':
-        return <MessageText {...iconProps} color="#3AA2DD" />;
-      case 'task':
-        return <Task {...iconProps} color="#22C55E" />;
-      case 'archive':
-        return <Archive {...iconProps} color="#6C7278" />;
-      default:
-        return <InfoCircle {...iconProps} color="#6C7278" />;
+    switch (type) {
+      case 'incident-taken':    return <DocumentText {...iconProps} color="#3AA2DD" />;
+      case 'incident-resolved': return <TickCircle {...iconProps} color="#22C55E" />;
+      case 'collaboration':     return <People {...iconProps} color="#F59E0B" />;
+      case 'report':            return <Camera {...iconProps} color="#3AA2DD" />;
+      case 'alert':             return <Danger {...iconProps} color="#EF4444" />;
+      case 'warning':           return <Warning2 {...iconProps} color="#F59E0B" />;
+      case 'info':              return <InfoCircle {...iconProps} color="#6C7278" />;
+      case 'message':           return <MessageText {...iconProps} color="#3AA2DD" />;
+      case 'task':              return <Task {...iconProps} color="#22C55E" />;
+      case 'archive':           return <Archive {...iconProps} color="#6C7278" />;
+      default:                  return <InfoCircle {...iconProps} color="#6C7278" />;
     }
   };
 
-  const activities = [
-    {
-      id: 1,
-      type: 'incident-taken',
-      title: 'La mairie de la commune IV',
-      description: 'a pris en compte un incident.',
-      time: 'À l\'instant',
-      severity: 'info',
-      unread: true
-    },
-    {
-      id: 2,
-      type: 'incident-resolved',
-      title: 'L\'Unicef',
-      description: 'a résolu un incident.',
-      time: 'Il y a 5 min',
-      severity: 'success',
-      unread: true
-    },
-    {
-      id: 3,
-      type: 'collaboration',
-      title: 'Le GEDEFOR',
-      description: 'demande une collaboration avec la DNACPN sur un incident.',
-      time: 'Il y a 12 min',
-      severity: 'warning',
-      unread: true
-    },
-    {
-      id: 4,
-      type: 'report',
-      title: 'Un Agent terrain',
-      description: 'a soumis un nouveau rapport photo à Kayes.',
-      time: 'Il y a 26 min',
-      severity: 'info',
-      unread: true
-    },
-    {
-      id: 5,
-      type: 'alert',
-      title: 'Alerte IA:',
-      description: 'Détection de fumée anormale dans le secteur de Baoulé.',
-      time: 'Il y a 32 min',
-      severity: 'danger',
-      unread: false
-    },
-    {
-      id: 6,
-      type: 'message',
-      title: 'La DNACPN',
-      description: 'a envoyé un message concernant le rapport de Kayes.',
-      time: 'Il y a 45 min',
-      severity: 'info',
-      unread: false
-    },
-    {
-      id: 7,
-      type: 'task',
-      title: 'Un superviseur',
-      description: 'a validé une tâche de surveillance.',
-      time: 'Il y a 1h',
-      severity: 'success',
-      unread: false
-    },
-    {
-      id: 8,
-      type: 'warning',
-      title: 'Système',
-      description: 'Niveau d\'alerte élevé détecté dans la zone de Sikasso.',
-      time: 'Il y a 1h 30min',
-      severity: 'warning',
-      unread: false
-    },
-    {
-      id: 9,
-      type: 'incident-taken',
-      title: 'Le Ministère',
-      description: 'a pris en charge un incident prioritaire.',
-      time: 'Il y a 2h',
-      severity: 'info',
-      unread: false
-    },
-    {
-      id: 10,
-      type: 'archive',
-      title: 'Système',
-      description: 'a archivé 3 incidents résolus.',
-      time: 'Il y a 3h',
-      severity: 'info',
-      unread: false
-    }
-  ];
+  // Construit le flux d'activité à partir des incidents récents (données réelles)
+  const activities = (activity || []).map((inc) => {
+    const m = ETAT_MAP[inc.etat] || { type: 'info', severity: 'info', action: 'mis à jour' };
+    const minutes = (Date.now() - new Date(inc.created_at).getTime()) / 60000;
+    const zone = (inc.zone || '').trim();
+    return {
+      id: inc.id,
+      type: m.type,
+      title: inc.title || 'Incident',
+      description: m.action + (zone ? ` à ${zone}` : ''),
+      time: timeAgo(inc.created_at),
+      severity: m.severity,
+      unread: minutes < 120, // moins de 2 h
+    };
+  });
 
   const unreadCount = activities.filter(a => a.unread).length;
+  const loading = isLoading || activity === undefined;
 
   return (
     <div className="activity-panel">
@@ -146,23 +80,29 @@ export const ActivityPanel = () => {
       </div>
 
       <div className="activity-list">
-        {activities.map((activity) => (
-          <div 
-            key={activity.id} 
-            className={`activity-item activity-${activity.severity} ${activity.unread ? 'unread' : ''}`}
-          >
-            <div className="activity-icon-wrapper">
-              {getActivityIcon(activity.type, activity.severity)}
+        {loading ? (
+          <div className="activity-item"><div className="activity-content"><p className="activity-text">Chargement…</p></div></div>
+        ) : activities.length === 0 ? (
+          <div className="activity-item"><div className="activity-content"><p className="activity-text">Aucune activité récente</p></div></div>
+        ) : (
+          activities.map((item) => (
+            <div
+              key={item.id}
+              className={`activity-item activity-${item.severity} ${item.unread ? 'unread' : ''}`}
+            >
+              <div className="activity-icon-wrapper">
+                {getActivityIcon(item.type)}
+              </div>
+              <div className="activity-content">
+                <p className="activity-text">
+                  <strong>{item.title}</strong> {item.description}
+                </p>
+                <span className="activity-time">{item.time}</span>
+              </div>
+              {item.unread && <div className="activity-unread-dot"></div>}
             </div>
-            <div className="activity-content">
-              <p className="activity-text">
-                <strong>{activity.title}</strong> {activity.description}
-              </p>
-              <span className="activity-time">{activity.time}</span>
-            </div>
-            {activity.unread && <div className="activity-unread-dot"></div>}
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       <div className="activity-footer">

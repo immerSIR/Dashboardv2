@@ -8,7 +8,7 @@ import MapContainer from './components/map/MapContainer';
 import StatsWidgets from './components/widgets/StatsWidgets';
 import ActivityPanel from './components/activity/ActivityPanel';
 import './dashboard.css';
-import { getIncidentsService } from './service/dashboard_service';
+import { getIncidentsService, getDashboardStatsService } from './service/dashboard_service';
 
 export const Dashboard = () => {
   const {
@@ -36,6 +36,17 @@ export const Dashboard = () => {
       onSuccess: (data) => {
         console.log('[DASHBOARD] Incidents chargés:', data);
       }
+    }
+  );
+
+  // Statistiques agrégées (cartes KPI, widgets, activité) — calculées côté backend
+  const { data: stats, isLoading: isLoadingStats } = useSWR(
+    '/incidents/dashboard-stats',
+    getDashboardStatsService,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60000,
+      errorRetryCount: 2,
     }
   );
 
@@ -79,16 +90,16 @@ export const Dashboard = () => {
             <MapContainer incidents={incidents} isLoading={isLoadingIncidents} />
             
             {/* 3 cartes métriques */}
-            <MetricsCards />
-            
+            <MetricsCards stats={stats} isLoading={isLoadingStats} />
+
             {/* 3 widgets statistiques */}
-            <StatsWidgets />
+            <StatsWidgets stats={stats} isLoading={isLoadingStats} />
           </div>
         </main>
-        
+
         {/* Sidebar droite fixe - Activité en temps réel */}
         <aside className="dashboard-sidebar-right">
-          <ActivityPanel />
+          <ActivityPanel activity={stats?.recent_activity} isLoading={isLoadingStats} />
         </aside>
       </div>
 
@@ -119,7 +130,7 @@ export const Dashboard = () => {
             >
               <CloseCircle size={28} variant="Bold" color="#6C7278" />
             </button>
-            <ActivityPanel />
+            <ActivityPanel activity={stats?.recent_activity} isLoading={isLoadingStats} />
           </div>
         </div>
       )}
