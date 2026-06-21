@@ -756,7 +756,7 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
             const commentStr = org.comment || `Invitation à rejoindre l'incident en tant que ${org.role}`;
             const result = await suggestCollaborationPartnerService(safeIncident.id, {
               incident: safeIncident.id,
-              suggested_partner: org.id,
+              suggested_organisation: org.id,
               suggested_role: roleStr,
               justification: commentStr,
               user: currentUserId ? parseInt(currentUserId) : null

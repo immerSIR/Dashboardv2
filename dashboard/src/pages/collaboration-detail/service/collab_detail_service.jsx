@@ -282,7 +282,9 @@ export const groupMessagesByDate = (messages) => {
  * Suggère une organisation partenaire pour une collaboration
  * @param {number} incidentId - ID de la collaboration
  * @param {Object} data - Données de la suggestion
- * @param {number} data.suggested_partner - ID de l'utilisateur/organisation
+ * @param {number} [data.suggested_organisation] - ID de l'organisation à inviter
+ *   (le backend résout son admin/bureau_agent comme partenaire)
+ * @param {number} [data.suggested_partner] - ID de l'utilisateur partenaire (alternative)
  * @param {string} data.suggested_role - 'contributor' | 'observer'
  * @param {string} data.justification - Motif de la suggestion
  * @returns {Promise<Object>} Résultat de la suggestion
@@ -290,14 +292,22 @@ export const groupMessagesByDate = (messages) => {
 export const suggestCollaborationPartnerService = async (incidentId, data) => {
   try {
     const axios = authService.createAuthenticatedAxios();
+    // Le backend accepte soit suggested_organisation (id org -> résout l'admin),
+    // soit suggested_partner (id user). On invite des organisations, donc on
+    // privilégie suggested_organisation quand il est fourni.
+    const payload = {
+      incident: data.incident,
+      suggested_role: data.suggested_role,
+      justification: data.justification || ''
+    };
+    if (data.suggested_organisation != null) {
+      payload.suggested_organisation = data.suggested_organisation;
+    } else {
+      payload.suggested_partner = data.suggested_partner;
+    }
     const response = await axios.post(
       `${API_URL_BASE}/MapApi/incidents/${incidentId}/suggestions/`,
-      {
-        incident: data.incident,
-        suggested_partner: data.suggested_partner,
-        suggested_role: data.suggested_role,
-        justification: data.justification || ''
-      },
+      payload,
       { headers: { 'Content-Type': 'application/json' } }
     );
     console.log('[Collaboration] Suggestion envoyée:', response.data);

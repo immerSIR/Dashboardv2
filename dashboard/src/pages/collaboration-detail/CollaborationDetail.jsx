@@ -1447,7 +1447,7 @@ export const CollaborationDetail = () => {
       suggestedOrgs.map(org =>
         suggestCollaborationPartnerService(collaboration.incidentId, {
           incident: collaboration.incidentId,
-          suggested_partner: org.id,
+          suggested_organisation: org.id,
           suggested_role: org.role === 'observateur' ? 'observer' : 'contributor',
           justification: org.comment || ''
         }).then(() => ({ ok: true, name: org.name }))
