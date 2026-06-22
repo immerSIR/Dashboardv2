@@ -571,17 +571,23 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
     } catch (err) {
       console.error('[Chat] Erreur envoi message:', err);
       const status = err?.response?.status;
-      let msg = "Une erreur est survenue lors de l'envoi de votre message.";
-      if (status === 400) {
+      // Détail réel renvoyé par le backend (cause exacte de l'échec)
+      const detail = err?.response?.data?.detail || err?.response?.data?.message;
+      let msg;
+      if (detail) {
+        // On surface le détail backend tel quel ; pour un 502 on précise qu'il
+        // vient du service IA (et que le message a quand même été enregistré).
+        msg = status === 502
+          ? `Service IA indisponible : ${detail} (votre message a été enregistré)`
+          : detail;
+      } else if (status === 400) {
         msg = "La prédiction de l'incident doit être terminée (avec des résultats) pour pouvoir interagir avec l'assistant.";
       } else if (status === 404) {
         msg = "L'incident n'a pas été trouvé.";
       } else if (status === 502) {
         msg = "Le service d'intelligence artificielle est temporairement indisponible, mais votre message a bien été enregistré.";
-      } else if (err?.response?.data?.detail) {
-        msg = err.response.data.detail;
-      } else if (err?.response?.data?.message) {
-        msg = err.response.data.message;
+      } else {
+        msg = err?.message || "Une erreur est survenue lors de l'envoi de votre message.";
       }
       setChatError(msg);
     } finally {
