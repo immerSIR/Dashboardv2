@@ -128,10 +128,16 @@ Write-only on create: `password`, `incident_preferences` (list, for élus).
 `id`, `title`, **`zone`** (string, **required**), `description`, `photo` (image), `video` (file), `audio` (file), `lattitude` (string), `longitude` (string), `etat` (enum, default `declared`), `user_id` (FK → reporter User), `category_id` (FK → Category), `indicateur_id` (FK → Indicateur), `category_ids` (M2M Category), `slug`, `taken_by` (FK → leader User, nullable), `take_in_charge_mode` (enum/null), `resolution_start_date`, `resolution_end_date` (dates; both required to close), **`progress`** (0–100, read-only, auto from confirmed tasks), `is_public` (default true), `is_deleted` (soft-delete flag), `created_at` (auto). Read-only computed: `reported_by_agent` (bool — reporter is a field agent).
 - **`IncidentGetSerializer`** nests the full `user_id` (User) and `category_id` (Category) objects; used by most list endpoints.
 - The OneToOne AI `prediction` is accessed via its own endpoints (see §6.7), not embedded here.
+- **Acting organisations (list + detail)** *(2026)* — both serializers now expose, so another org sees who is already working on an incident **before** opening it:
+  - **`taken_by_organisation`**: `{id, name}` of the org that took the incident in charge, or `null`.
+  - **`taken_by_name`**: full name of the person who took charge (not just the `taken_by` id).
+  - **`acting_organisations`**: `[{id, name, relation}]` — every org active on the incident; `relation` ∈ `leader` (took charge) · `assigned` (super-admin org assignment accepted) · `collaborator` (collaboration accepted). Deduplicated, strongest relation wins.
+- **`org_assignments`**: `[{id, organisation_id, organisation_name, status, deadline}]` (pending/accepted/declined super-admin assignments).
 
 ### Collaboration (`CollaborationSerializer` / `CollaborationEnrichedSerializer`)
 `id`, `incident` (FK), `user` (FK — the collaborating user/org rep), `role` (enum), `status` (enum, read-only — set via accept/decline), `motivation`, `end_date` (must be future), `other_option`, `created_at` (auto). Unique together `(incident, user)`.
 Read-only enrichments: `organisation_name`, `organisation_id`, `user_full_name`, `user_email`, `incident_title`, `incident_details` (full Incident), `prediction_details` (full Prediction). The dashboard serializer adds `user_role`, `incident_description/zone/etat/progress`, `start_date` (=created_at), `participants_count`.
+- **`sender` / `receiver`** *(2026)* — explicit parties of a collaboration request, both `{id, name, email, organisation_id, organisation_name}`: **`sender`** (émetteur) = the org requesting to join (`collaboration.user`); **`receiver`** (récepteur) = the leader who receives the request (`incident.taken_by`), or `null` if none yet. Use these in the "demande" tab so the logged-in org can tell whether it sent or received a request (don't infer from `user` alone).
 
 ### IncidentTask (`IncidentTaskSerializer`, `fields=__all__`)
 `id`, `incident` (FK, from URL), `title` (required), `description`, `start_date`, `end_date` (required; start ≤ end), `state` (enum), `proof_image`, `proof_video` (required when `state=done`), `failure_reason` (required when `state=failed`), `assigned_to` (FK User), `created_by` (auto), **`is_confirmed`** (read-only; auto-true if leader created it; only confirmed tasks count toward incident `progress`), `created_at`/`updated_at` (auto).
@@ -225,8 +231,9 @@ Legend — Auth: **none** (public), **Bearer** (any authenticated user), or a sp
 | `GET·PUT·DELETE /MapApi/incident/<id>` *(no slash)* | GET/PUT none; **DELETE** `IsSuperAdminOrOrgOwnIncident` | Retrieve / full update / **soft-delete** (`is_deleted=true`, `204`). PUT sends status emails when `etat` becomes `resolved`/`in_progress` (PUT requires an `etat` key in body). |
 | `GET /MapApi/incidentByZone/<zone>/` | none | All incidents for a numeric zone (plain list). |
 | `GET /MapApi/my-incidents/` | Bearer | Incidents reported by current user. |
+| `GET /MapApi/my-interventions/` *(2026)* | Bearer | Incidents the user/org **works on** (took charge perso/org, accepted org-assignment, accepted collaboration, or assigned as agent). Each incident (`IncidentGetSerializer`) + **`assigned_agents`** `[{id,name,email,phone,org_role,organisation_id,organisation_name,assignment_status,deadline}]` + **`reports_count`**. |
 | `GET /MapApi/org-incidents/` | Bearer | Incidents of the user's org. `?source=agents|citizens|all` (default `all`). |
-| `GET /MapApi/incident-filter/` | none* | `?filter_type=today|yesterday|last_7_days|last_30_days|this_month|last_month|custom_range` (+ `custom_start`,`custom_end`). Plain list. |
+| `GET /MapApi/incident-filter/` | none* (Bearer for `scope=mine`) | Lightweight map list w/ **`severity`**. `?scope=all\|mine\|resolved\|unresolved` *(2026, one URL for the dashboard map; `mine`=incidents the user's org acts on)* + `?filter_type=today\|yesterday\|last_7_days\|last_30_days\|this_month\|last_month\|custom_range` (+ `custom_start`,`custom_end`). scope and filter_type combine. |
 | `GET /MapApi/Search/` | none* | `?search_term=` (required) — matches title/description. |
 | `GET /MapApi/incidentDetail/<incident_id>` *(no slash)* | Bearer | `{status, user: <taken_by User>}`. |
 
@@ -284,6 +291,7 @@ Legend — Auth: **none** (public), **Bearer** (any authenticated user), or a sp
 | `GET·POST /MapApi/incidents/<id>/assignments/` | Bearer + manage (staff or org_admin/bureau on own incident) | List / **assign a field agent** (`{agent, deadline, ...}`). POST emails the agent. |
 | `GET·PUT·PATCH·DELETE /MapApi/incidents/<id>/assignments/<pk>/` | Bearer + manage | Assignment RUD. |
 | `GET /MapApi/agent/assigned-incidents/` | Bearer | Assignments for the current **field agent** (GET only). |
+| `GET /MapApi/incidents/<id>/reports/` *(2026)* | Bearer | All agent reports for an incident (`Rapport` via FK **or** M2M), each `{id, details, type, statut, date_livraison, disponible, file, created_at, author:{id,name,email,organisation_id,organisation_name}}`. Serves the "Mes interventions" reports view **and** the collaboration-detail reports column (reports of each org working on the incident). |
 | `GET·POST /MapApi/field-reports/` | Bearer (POST: field agents on assigned incidents) | List (role-scoped) / create a field visit report. multipart `photo`; sets matching assignment to `reported`. |
 | `GET·POST /MapApi/discussion/<incident_id>/` | Bearer + accepted collaborator | Group chat per incident. POST multipart `{message?, audio?, attachment?, recipient?}` (≥1 of message/audio/attachment). Blocked once incident `resolved`. |
 
