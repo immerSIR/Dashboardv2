@@ -89,8 +89,11 @@ Toutes les valeurs sont les chaînes brutes stockées/renvoyées par l'API (depu
 |---|---|---|
 | **Statut d'incident** | `Incident.etat` | `declared`, `taken_into_account`, `in_progress`, `resolved` |
 | **Mode de prise en charge** | `Incident.take_in_charge_mode` | `internal`, `collaborative`, `null` |
+| **Rôle web (CANONIQUE)** | `User.web_role` *(lecture seule, calculé)* | `super_admin`, `org_admin`, `bureau_agent`, `field_agent`, `null` |
 | **Type d'utilisateur** | `User.user_type` | `admin`, `visitor`, `reporter`, `citizen`, `business`, `elu`, `field_agent` |
 | **Rôle interne (organisation)** | `User.org_role` | `org_admin`, `bureau_agent`, `field_agent`, `null` |
+
+> **Quel champ de rôle utiliser :** toujours lire **`web_role`** pour l'autorisation du dashboard. C'est le rôle canonique unique, calculé côté serveur : `is_superuser ? super_admin : (org_role ou null)` (cf. `Mapapi/roles.py`). Un utilisateur sans rôle vaut `null` — **jamais** super_admin. `org_role` est le champ interne brut (pas de valeur super_admin) ; `user_type` est une classification héritée de l'app citoyenne (`elu`, `citizen`, …) **sans rapport** avec l'accès dashboard — ne pas en déduire le rôle. `web_role` est désormais présent sur toute représentation d'utilisateur (`UserSerializer`, users imbriqués incident/collaboration, et `OrganisationMemberSerializer`).
 | **Rôle de collaboration** | `Collaboration.role` | `leader`, `contributor`, `observer` (défaut `contributor` ; `leader` est attribué automatiquement uniquement, jamais demandable) |
 | **Statut de collaboration** | `Collaboration.status` | `pending`, `accepted`, `declined` |
 | **État de tâche** | `IncidentTask.state` | `pending`, `in_progress`, `done`, `failed` |

@@ -89,8 +89,11 @@ All values are the raw strings stored/returned by the API (from `models.py`).
 |---|---|---|
 | **Incident status** | `Incident.etat` | `declared`, `taken_into_account`, `in_progress`, `resolved` |
 | **Incident take-in-charge mode** | `Incident.take_in_charge_mode` | `internal`, `collaborative`, `null` |
+| **Web role (CANONICAL)** | `User.web_role` *(read-only, computed)* | `super_admin`, `org_admin`, `bureau_agent`, `field_agent`, `null` |
 | **User type** | `User.user_type` | `admin`, `visitor`, `reporter`, `citizen`, `business`, `elu`, `field_agent` |
 | **Org role (internal)** | `User.org_role` | `org_admin`, `bureau_agent`, `field_agent`, `null` |
+
+> **Which role field to use:** always read **`web_role`** for dashboard authorization. It is the single canonical role, computed server-side as `is_superuser ? super_admin : (org_role or null)` (see `Mapapi/roles.py`). A user with no role resolves to `null` — **never** super_admin. `org_role` is the raw internal field (no super_admin value); `user_type` is a legacy/citizen-app classification (`elu`, `citizen`, …) and is **unrelated** to dashboard access — do not derive the dashboard role from it. `web_role` is now present on every user representation (`UserSerializer`, nested incident/collaboration users, and `OrganisationMemberSerializer`).
 | **Collaboration role** | `Collaboration.role` | `leader`, `contributor`, `observer` (default `contributor`; `leader` is auto-assigned only, never requestable) |
 | **Collaboration status** | `Collaboration.status` | `pending`, `accepted`, `declined` |
 | **Task state** | `IncidentTask.state` | `pending`, `in_progress`, `done`, `failed` |
