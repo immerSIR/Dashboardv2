@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Setting2, LogoutCurve, ArrowDown2, Notification, Danger, People, InfoCircle } from 'iconsax-react';
 import logoMapActionMin from '../../assets/logo-min.svg';
 import { authService } from '../../pages/auth/services/authService';
 import { getNotifications, markNotificationAsRead } from './service/notification_service';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import './header.css';
 
 export const Header = ({ onMenuToggle, user }) => {
@@ -17,27 +18,31 @@ export const Header = ({ onMenuToggle, user }) => {
 
   const languages = ['Bambara', 'Fulfulde', 'Français'];
   
-  // Charger les notifications
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        setIsLoadingNotifications(true);
-        const data = await getNotifications();
-        console.log('[HEADER] Notifications chargées:', data);
-        setNotifications(data);
-      } catch (error) {
-        console.error('[HEADER] Erreur chargement notifications:', error);
-      } finally {
-        setIsLoadingNotifications(false);
-      }
-    };
+  // Charger les notifications (réutilisable : appel initial, poll de secours, push WS)
+  const fetchNotifications = useCallback(async () => {
+    try {
+      setIsLoadingNotifications(true);
+      const data = await getNotifications();
+      setNotifications(data);
+    } catch (error) {
+      console.error('[HEADER] Erreur chargement notifications:', error);
+    } finally {
+      setIsLoadingNotifications(false);
+    }
+  }, []);
 
+  useEffect(() => {
     fetchNotifications();
-    
-    // Rafraîchir toutes les 30 secondes
+    // Poll de secours (30 s) ; le temps réel passe par le WebSocket ci-dessous.
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchNotifications]);
+
+  // Temps réel : à chaque notification poussée par le serveur, on rafraîchit.
+  useWebSocket(
+    authService.isAuthenticated() ? '/ws/notifications/' : null,
+    fetchNotifications,
+  );
   
   const unreadCount = notifications.filter(n => !n.read).length;
 

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { ShimmerThumbnail, ShimmerTitle, ShimmerText, ShimmerButton } from 'react-shimmer-effects';
 import { useSidebarState } from '../../hooks/useSidebarState';
 import { Header, Sidebar } from '../../components/layout';
@@ -348,8 +349,19 @@ export const CollaborationDetail = () => {
     () => getDiscussionMessagesService(incidentId),
     {
       revalidateOnFocus: false,
-      refreshInterval: 5000 // actualisation toutes les 5 secondes
+      refreshInterval: 5000 // poll de secours ; le temps réel passe par le WS
     }
+  );
+
+  // Temps réel : discussion et tâches de l'incident poussées par le serveur.
+  // À chaque message poussé, on revalide la liste concernée (réutilise les adapters).
+  useWebSocket(
+    incidentId ? `/ws/incidents/${incidentId}/discussion/` : null,
+    () => mutateMessages(),
+  );
+  useWebSocket(
+    incidentId ? `/ws/incidents/${incidentId}/tasks/` : null,
+    () => mutateTasks(),
   );
 
   // Formater les messages pour l'affichage
