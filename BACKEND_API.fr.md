@@ -6,6 +6,8 @@ Ce document décrit le backend Django REST qui alimente ce dashboard. Dépôt so
 
 > 🇬🇧 Une version anglaise existe : [`BACKEND_API.md`](./BACKEND_API.md). Les deux fichiers doivent rester synchronisés.
 
+> **⚠️ Les IDs sont des UUID (2026).** Chaque clé primaire et étrangère est désormais une **chaîne UUID** (ex. `"3f9a…-…"`), plus un entier — pour empêcher l'énumération des ids (IDOR). Les routes de détail sont `/<uuid>` (ex. `GET /MapApi/incident/<uuid>`). Côté frontend, **ne jamais faire `parseInt()` sur un id** ; comparer les ids en chaîne. Les tables ont aussi migré du schéma `extensions` vers **`public`**. La migration a invalidé les anciennes sessions (le token portait l'ancien id entier) — les utilisateurs se reconnectent une fois.
+
 ---
 
 ## 1. Conventions (à lire en premier)

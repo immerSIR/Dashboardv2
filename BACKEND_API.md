@@ -6,6 +6,8 @@ This documents the Django REST backend that powers this dashboard. Source repo: 
 
 > 🇫🇷 A French version exists: [`BACKEND_API.fr.md`](./BACKEND_API.fr.md). Keep both files in sync.
 
+> **⚠️ IDs are UUIDs (2026).** Every primary key and foreign key is now a **UUID string** (e.g. `"3f9a…-…"`), not an integer — to prevent id enumeration (IDOR). Detail routes are `/<uuid>` (e.g. `GET /MapApi/incident/<uuid>`). On the frontend, **never `parseInt()` an id**; compare ids as strings. DB tables also moved from the `extensions` schema to **`public`**. The migration invalidated old sessions (tokens carried the old integer user id) — users re-login once.
+
 ---
 
 ## 1. Conventions (read first)
