@@ -2,7 +2,14 @@
 
 Ce document décrit le backend Django REST qui alimente ce dashboard. Dépôt source : **https://github.com/223MapAction/Mapapi** (Django + DRF + SimpleJWT + Celery/Redis + Postgres/Supabase). URL de base en production : **`https://api.map-action.com`** (définie dans `src/config/api_url_base.jsx`).
 
-> Portée : tout ce dont le frontend a besoin — endpoints, authentification, schémas de requête/réponse, énumérations et pièges. Produit en étudiant le code source du backend (`Mapapi/urls.py`, `views/`, `serializer.py`, `models.py`, `permissions.py`, `backend/settings.py`). Le backend expose aussi un schéma OpenAPI en direct sur `/MapApi/api/schema/`, avec Swagger UI sur `/MapApi/schema/swagger-ui/` et ReDoc sur `/MapApi/schema/redoc/`.
+> Portée : tout ce dont le frontend a besoin — endpoints, authentification, schémas de requête/réponse, énumérations et pièges. Produit en étudiant le code source du backend (`Mapapi/urls.py`, `views/`, `serializer.py`, `models.py`, `permissions.py`, `backend/settings.py`).
+
+> ### 🔎 Documentation interactive (Swagger / OpenAPI)
+> Le backend expose une documentation interactive **en direct, toujours à jour** — le moyen le plus rapide d'explorer et *tester* les endpoints :
+> - **Swagger UI :** `<backend>/MapApi/schema/swagger-ui/` — cliquez sur **Authorize**, collez votre token `access` (obtenu via `POST /MapApi/login/`) et appelez n'importe quel endpoint.
+> - **ReDoc :** `<backend>/MapApi/schema/redoc/` · **Schéma brut :** `<backend>/MapApi/api/schema/`
+>
+> Sur notre déploiement `<backend>` = `https://backend-production-0726b.up.railway.app`. Chaque opération est taguée par domaine (Incidents, Collaboration, Organisations, Auth…) avec les vrais corps de requête/réponse, paramètres et codes d'erreur. Ce fichier Markdown reste le compagnon commenté (justifications, pièges, divergences) ; Swagger est la référence exhaustive générée automatiquement.
 
 > 🇬🇧 Une version anglaise existe : [`BACKEND_API.md`](./BACKEND_API.md). Les deux fichiers doivent rester synchronisés.
 
@@ -347,7 +354,7 @@ Liste/création standard sur la collection et récupération/màj/suppression su
 - **Indicateurs :** `GET·POST /MapApi/indicator/`, `GET·PUT·DELETE /MapApi/indicator/<id>`.
 - **Zones :** `GET·POST /MapApi/zone/`, `GET·PUT·DELETE /MapApi/zone/<id>`.
 - **Rapports :** `GET·POST /MapApi/rapport/`, `GET·PUT·DELETE /MapApi/rapport/<id>` (PUT avec `disponible`/`file` envoie un email au demandeur), `GET /MapApi/rapport_user/<id>`, `GET·POST /MapApi/rapport_zone/` (les rapports de zone rattachent automatiquement tous les incidents de la zone).
-- **Messages :** `GET·POST /MapApi/message/`, `GET·PUT·DELETE /MapApi/message/<int:id>`, `GET /MapApi/message/<zone>` (par nom de zone), `GET /MapApi/message_user/<id>/`. **Réponses :** `GET·POST /MapApi/response_msg/`, `GET·PUT·DELETE /MapApi/response_msg/<id>`.
+- **Messages :** `GET·POST /MapApi/message/`, `GET·PUT·DELETE /MapApi/message/<uuid:id>`, `GET /MapApi/message/<zone>` (par nom de zone), `GET /MapApi/message_user/<id>/`. **Réponses :** `GET·POST /MapApi/response_msg/`, `GET·PUT·DELETE /MapApi/response_msg/<id>`.
 - **Communautés :** `GET·POST /MapApi/community/`, `GET·PUT·DELETE /MapApi/community/<id>`.
 - **Contacts :** `GET·POST /MapApi/contact/`, `GET·PUT·DELETE /MapApi/contact/<id>` (POST envoie un email aux admins).
 - **Événements :** `GET·POST /MapApi/Event/`, `GET·PUT·DELETE /MapApi/Event/<id>` (multipart `photo/video/audio` ; `user_id` obligatoire, +2 points).
