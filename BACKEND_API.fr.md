@@ -186,7 +186,7 @@ L'analyse IA/géo/impact d'un incident (OneToOne `incident`). Gros objet — cha
 - **Participate :** `id, evenement_id` (FK), `user_id` (FK), `created_at`.
 - **Notification :** `id, user` (FK), `message`, `read` (bool), `colaboration` (FK Collaboration — noter l'orthographe), `created_at`.
 - **UserAction :** `id, user` (FK), `action`, `timeStamp`.
-- **ChatHistory :** champs hérités `{session_id, question, answer}` + par message `{incident, user, role, content, created_at}`.
+- **ChatHistory :** par message `{incident, user, role, content, created_at}` (chat IA de l'incident, par utilisateur via `incidents/<id>/chat/`). Les anciennes colonnes `{session_id, question, answer}` sont dépréciées/inutilisées — leurs endpoints ont été supprimés.
 
 ---
 
@@ -334,7 +334,6 @@ Toutes publiques (`permission_classes=()`) ; renvoient des agrégats JSON, pas d
 |---|---|---|
 | `GET /MapApi/notifications/` | Bearer | Notifications de l'utilisateur courant **où la collaboration liée est encore `pending`** (c.-à-d. les demandes de collaboration en attente). |
 | `GET /MapApi/user_action/` | Bearer | Journal d'actions de l'utilisateur courant. |
-| `GET /MapApi/histories/` · `GET /MapApi/history/<id>` *(sans slash)* · `POST /MapApi/histories/add/` | aucune | Historique de chat hérité `{session_id,question,answer}`. |
 
 ### 6.11 Corbeille & actions groupées (super admin)
 
