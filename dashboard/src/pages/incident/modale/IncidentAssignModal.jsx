@@ -5,6 +5,7 @@ import { useIncidentModalContext } from './IncidentModalContext';
 import { assignIncidentToAgentService } from '../service/incident_service';
 import { getOrganisationsService } from '../../organisations/service/organisation_service';
 import { getOrganisationMembersService } from '../../agents/service/members_service';
+import { idSeed } from '../../../utils/idSeed';
 
 const AVATAR_COLORS = [
   '#EF4444', '#F97316', '#F59E0B', '#22C55E',
@@ -79,7 +80,7 @@ export const IncidentAssignModal = () => {
                 role: roleLabel,
                 orgId: org.id,
                 orgName: org.name,
-                avatarColor: AVATAR_COLORS[Math.abs(m.id) % AVATAR_COLORS.length] || '#3AA2DD'
+                avatarColor: AVATAR_COLORS[idSeed(m.id) % AVATAR_COLORS.length] || '#3AA2DD'
               });
             }
           });

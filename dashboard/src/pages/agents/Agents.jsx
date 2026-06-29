@@ -8,6 +8,7 @@ import {
 } from 'iconsax-react';
 import { ShimmerTable } from 'react-shimmer-effects';
 import { ROLES, AVATAR_COLORS } from './data/agents';
+import { idSeed } from '../../utils/idSeed';
 import { getOrganisationsService } from '../organisations/service/organisation_service';
 import { getOrganisationMembersService } from './service/members_service';
 import AgentsContext from './modale/AgentsModalContext';
@@ -50,7 +51,7 @@ const fetcher = async ([, organisationsList]) => {
           organisationId: org.id,
           organisationName: org.name,
           status: 'active',
-          avatarColor: AVATAR_COLORS[Math.abs(m.id) % AVATAR_COLORS.length] || '#3AA2DD',
+          avatarColor: AVATAR_COLORS[idSeed(m.id) % AVATAR_COLORS.length] || '#3AA2DD',
         });
       });
     } catch (err) {

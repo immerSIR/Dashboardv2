@@ -5,23 +5,11 @@ import Map, { Marker } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { ShimmerThumbnail, ShimmerTitle, ShimmerText } from 'react-shimmer-effects';
 import { getIncidentService, getIncidentsService, getResolvedIncidentsService } from '../../../incident/service/incident_service';
+import { idSeed } from '../../../../utils/idSeed';
 import './map.css';
 
 // Token Mapbox depuis les variables d'environnement
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
-
-// Graine numérique déterministe à partir d'un id. Les ids sont des UUID (chaînes) :
-// les passer directement à Math.sin/cos donnerait NaN (→ Marker LngLat invalide,
-// crash de la carte). On hashe la chaîne en un petit entier stable.
-const seedFromId = (id) => {
-  if (typeof id === 'number' && Number.isFinite(id)) return id;
-  const s = String(id ?? '');
-  let h = 0;
-  for (let i = 0; i < s.length; i += 1) {
-    h = (h * 31 + s.charCodeAt(i)) % 100000;
-  }
-  return h;
-};
 
 // Détermine la sévérité d'un incident à partir de base_severity (0 à 10) ou de ses badges
 const getSeverity = (project) => {
@@ -226,7 +214,7 @@ export const MapContainer = ({ incidents = [], isLoading = false }) => {
       hasFallbackCoords = true;
       // Variation déterministe (graine numérique dérivée de l'UUID) pour éviter la
       // superposition parfaite des incidents sans coordonnées.
-      const offsetSeed = seedFromId(inc.id);
+      const offsetSeed = idSeed(inc.id);
       finalLat = DEFAULT_MALI_LAT + (Math.sin(offsetSeed) * 0.005);
       finalLng = DEFAULT_MALI_LNG + (Math.cos(offsetSeed) * 0.005);
     }
