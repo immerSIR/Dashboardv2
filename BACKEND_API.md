@@ -228,7 +228,7 @@ Legend — Auth: **none** (public), **Bearer** (any authenticated user), or a sp
 | `GET /MapApi/organisations/<pk>/detail/` | none | Org + `stats`: `{member_count, field_agents_count, bureau_agents_count, admins_count, incident_count, resolved_incident_count}`. |
 | `GET /MapApi/organisations/<pk>/members/` | Bearer + org_admin/bureau or staff | List members (`OrganisationMemberSerializer`). |
 | `POST /MapApi/organisations/<pk>/members/add/` | Bearer + org_admin/bureau or staff | `{user_id, org_role}` → attaches existing user. New field agents return one-time `initial_pin`. |
-| `PATCH·DELETE /MapApi/organisations/<pk>/members/<user_id>/` | Bearer + org_admin/bureau or staff | Edit (`email, first_name, last_name, phone, org_role`) / remove member. |
+| `PATCH·DELETE /MapApi/organisations/<pk>/members/<user_id>/` | Bearer + org_admin/bureau or staff | Edit (`email, first_name, last_name, phone, org_role`) / remove member. **Anti-lockout: an org admin can't remove/downgrade the org's last active admin (`400`); a Super Admin can override it.** |
 | `POST /MapApi/organisations/<pk>/agents/create/` | Bearer + org_admin/bureau or staff | Create a field agent in one call `{first_name,last_name,email,phone,address?}` → returns `initial_pin`, `must_change_pin`, emails credentials. |
 | `POST /MapApi/organisations/<pk>/staff/create/` | Bearer + org_admin or staff | Create staff `{first_name,last_name,email,org_role(org_admin|bureau_agent),phone?,address?}` → returns **`temp_password`** (display it so the admin can share it — email delivery isn't guaranteed), plus `email_sent`, `must_change_password:true`. |
 | `GET /MapApi/agents/` *(2026)* | Bearer | Global agents list (all org members with a role), **newest-first**, paginated. Filters: `?search=` (name/email/org), `?role=org_admin\|bureau_agent\|field_agent`, `?status=active\|inactive`. Rows = `OrganisationMemberSerializer`. |
@@ -240,7 +240,7 @@ Legend — Auth: **none** (public), **Bearer** (any authenticated user), or a sp
 
 | Method · Path | Auth | Notes |
 |---|---|---|
-| `GET·POST /MapApi/incident/` | none | Paginated list **(20/page** by default; `?page=&page_size=`, max 100) (`IncidentGetSerializer`, incl. `thumbnail`) / **create**. Create: `IncidentSerializer` fields, **`zone` required**, multipart for `photo/video/audio`. Side effects: get-or-create Zone, +1 reporter points, kicks off AI `Prediction` if a `photo` exists. |
+| `GET·POST /MapApi/incident/` | none | Paginated list **(20/page**; `?page=&page_size=`, max 100). **Filters: `?search=` (title/description/zone), `?etat=<status>`, `?severity=<level>`** (combinable). (`IncidentGetSerializer`, incl. `thumbnail`) / **create**. Create: `IncidentSerializer` fields, **`zone` required**, multipart for `photo/video/audio`. Side effects: get-or-create Zone, +1 reporter points, kicks off AI `Prediction` if a `photo` exists. |
 | `GET·PUT·DELETE /MapApi/incident/<id>` *(no slash)* | GET/PUT none; **DELETE** `IsSuperAdminOrOrgOwnIncident` | Retrieve / full update / **soft-delete** (`is_deleted=true`, `204`). PUT sends status emails when `etat` becomes `resolved`/`in_progress` (PUT requires an `etat` key in body). |
 | `GET /MapApi/incidentByZone/<zone>/` | none | All incidents for a numeric zone (plain list). |
 | `GET /MapApi/my-incidents/` | Bearer | Incidents reported by current user. |
@@ -336,7 +336,7 @@ All public (`permission_classes=()`); return JSON aggregates, not paginated list
 | Method · Path | Auth | Notes |
 |---|---|---|
 | `GET /MapApi/notifications/` | Bearer | **All** the current user's notifications, **newest-first**, paginated (20/page; `?page=&page_size=`). Each has a **`link`** (redirect target, see §6.14). Filter `?read=true\|false` (`?read=false` → `count` = number unread). |
-| `GET /MapApi/activity-feed/` *(2026)* | Bearer | Platform activity **outside the user's own org** (who took/resolved incidents, etc.), newest-first, paginated. Items: `{action, user_name, organisation_name, created_at, timeStamp}`. (Currently sourced from `UserAction` — incident actions; collaborations/reports/AI can be added.) |
+| `GET /MapApi/activity-feed/` *(2026)* | Bearer | Platform activity **outside the user's own org** (who took/resolved incidents, etc.), newest-first, paginated. Items: `{action, user_name, organisation_name, created_at, timeStamp}`. (Sourced from `UserAction`: incident actions **+ collaboration requests/accept/decline**. Reports/AI can still be added.) |
 | `GET /MapApi/user_action/` | Bearer | Current user's action log. |
 
 ### 6.11 Trash & bulk (super admin)
