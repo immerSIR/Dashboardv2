@@ -3,16 +3,26 @@ import { API_URL_BASE } from '../../../config/api_url_base';
 
 const API_URL = API_URL_BASE;
 
-// Clés de stockage
+// Auth par cookie httpOnly : le JWT n'est JAMAIS stocké côté JS (protégé du XSS).
+// Le navigateur envoie le cookie automatiquement → toutes les requêtes doivent
+// inclure les credentials. On ne stocke en session que le profil (non sensible)
+// pour l'UI et pour savoir si on est connecté.
+axios.defaults.withCredentials = true;
+
+// Clés de stockage (profil utilisateur uniquement — plus AUCUN token).
 const STORAGE_KEYS = {
-  ACCESS_TOKEN: 'access_token',
-  REFRESH_TOKEN: 'refresh_token',
   USER: 'user',
   USER_ID: 'user_id',
   FIRST_NAME: 'first_name',
   ZONE: 'zone',
   USER_TYPE: 'user_type',
   ORGANISATION: 'organisation',
+};
+
+// Lit un cookie (ex. le csrftoken, non-httpOnly, à renvoyer en X-CSRFToken).
+const getCookie = (name) => {
+  const match = document.cookie.match(new RegExp('(^|;\\s*)' + name + '=([^;]*)'));
+  return match ? decodeURIComponent(match[2]) : null;
 };
 
 export const authService = {
@@ -34,33 +44,17 @@ export const authService = {
 
       console.log('[AUTH] Réponse login:', authResponse.status, authResponse.data);
 
-      const { access, refresh } = authResponse.data;
+      // Le login a posé les cookies httpOnly (access/refresh) + le cookie csrftoken.
+      // On ne stocke AUCUN token côté JS.
 
-      if (!access) {
-        throw new Error('Token d\'accès non reçu');
-      }
+      // 2. Récupération du profil — le cookie d'accès suffit (withCredentials global).
+      const userResponse = await axios.get(`${API_URL}/MapApi/user_retrieve/`);
 
-      console.log('[AUTH] Token reçu, récupération user avec:', access.substring(0, 20) + '...');
-
-      // 2. Récupération des informations utilisateur
-      const userResponse = await axios.get(
-        `${API_URL}/MapApi/user_retrieve/`,
-        {
-          headers: {
-            Authorization: `Bearer ${access}`,
-          },
-        }
-      );
-
-      console.log('[AUTH] Réponse user_retrieve:', userResponse.status, userResponse.data);
+      console.log('[AUTH] Réponse user_retrieve:', userResponse.status);
 
       const userData = userResponse.data.data || userResponse.data;
 
-      console.log('[AUTH] Données user:', userData);
-
-      // 3. Stockage dans sessionStorage
-      sessionStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, access);
-      sessionStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refresh);
+      // 3. Stockage du profil uniquement (non sensible) pour l'UI.
       sessionStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
       sessionStorage.setItem(STORAGE_KEYS.USER_ID, userData.id);
       sessionStorage.setItem(STORAGE_KEYS.FIRST_NAME, userData.first_name);
@@ -71,7 +65,6 @@ export const authService = {
       return {
         success: true,
         user: userData,
-        tokens: { access, refresh },
       };
     } catch (error) {
       console.error('[AUTH] Erreur complète:', error);
@@ -92,12 +85,21 @@ export const authService = {
   },
 
   /**
-   * Déconnexion de l'utilisateur
+   * Déconnexion : efface les cookies httpOnly côté serveur + le profil local.
    */
-  logout: () => {
+  logout: async () => {
+    try {
+      await axios.post(`${API_URL}/MapApi/logout/`, {});
+    } catch (e) {
+      // On vide le local quoi qu'il arrive.
+      console.warn('[AUTH] logout serveur:', e?.response?.status);
+    }
     Object.values(STORAGE_KEYS).forEach((key) => {
       sessionStorage.removeItem(key);
     });
+    // Nettoyage d'éventuels anciens tokens stockés (migration cookie).
+    sessionStorage.removeItem('access_token');
+    sessionStorage.removeItem('refresh_token');
   },
 
   /**
@@ -110,48 +112,35 @@ export const authService = {
   },
 
   /**
-   * Vérifie si l'utilisateur est authentifié
+   * Vérifie si l'utilisateur est authentifié. Le vrai justificatif est le cookie
+   * httpOnly (illisible par JS) ; on s'appuie donc sur la présence du profil en
+   * session. Si le cookie a expiré, les appels API renverront 401.
    * @returns {boolean}
    */
   isAuthenticated: () => {
-    return !!sessionStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+    return !!sessionStorage.getItem(STORAGE_KEYS.USER);
   },
 
   /**
-   * Récupère le token d'accès
-   * @returns {string|null}
+   * Token d'accès : plus jamais accessible côté JS (cookie httpOnly).
+   * Conservé pour compat d'API ; renvoie toujours null.
    */
-  getAccessToken: () => {
-    return sessionStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-  },
+  getAccessToken: () => null,
+
+  getRefreshToken: () => null,
 
   /**
-   * Récupère le token de rafraîchissement
-   * @returns {string|null}
-   */
-  getRefreshToken: () => {
-    return sessionStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-  },
-
-  /**
-   * Rafraîchit le token d'accès
-   * @returns {Promise<string|null>}
+   * Rafraîchit l'access token via le cookie de refresh (aucun corps requis).
+   * @returns {Promise<boolean>} succès
    */
   refreshToken: async () => {
-    const refresh = sessionStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-    if (!refresh) return null;
-
     try {
-      const response = await axios.post(`${API_URL}/MapApi/token/refresh/`, {
-        refresh,
-      });
-      const { access } = response.data;
-      sessionStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, access);
-      return access;
+      await axios.post(`${API_URL}/MapApi/token/refresh/`, {});
+      return true; // nouveau cookie d'accès posé par le serveur
     } catch (error) {
-      console.error('Token refresh error:', error);
-      authService.logout();
-      return null;
+      console.error('Token refresh error:', error?.response?.status);
+      await authService.logout();
+      return false;
     }
   },
 
@@ -200,20 +189,12 @@ export const authService = {
    */
   changePassword: async ({ old_password, new_password }) => {
     try {
-      const token = authService.getAccessToken();
-      if (!token) {
-        throw new Error('Utilisateur non authentifié');
-      }
-
       console.log('[AUTH] Changement de mot de passe');
-      const response = await axios.post(
-        `${API_URL}/MapApi/change_password/`,
+      // Auth + CSRF via cookies (instance authentifiée).
+      const client = authService.createAuthenticatedAxios();
+      const response = await client.post(
+        `/MapApi/change_password/`,
         { old_password, new_password },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
       );
       console.log('[AUTH] Réponse changePassword:', response.data);
       return response.data;
@@ -225,18 +206,30 @@ export const authService = {
 
 
   /**
-   * Crée une instance axios configurée avec le token
+   * Crée une instance axios authentifiée par cookie httpOnly.
+   * - withCredentials : envoie le cookie JWT automatiquement.
+   * - X-CSRFToken : requis par le backend sur les écritures (lu du cookie csrftoken).
+   * Plus aucun en-tête Authorization (le token n'est plus accessible au JS).
    * @returns {AxiosInstance}
    */
   createAuthenticatedAxios: () => {
-    const token = authService.getAccessToken();
-    return axios.create({
+    const instance = axios.create({
       baseURL: API_URL,
+      withCredentials: true,
       headers: {
-        Authorization: token ? `Bearer ${token}` : '',
         'Content-Type': 'application/json',
       },
     });
+    // Ajoute le token CSRF sur chaque requête (le backend ne le vérifie que sur
+    // les méthodes non sûres, mais l'envoyer partout est sans risque).
+    instance.interceptors.request.use((config) => {
+      const csrf = getCookie('csrftoken');
+      if (csrf) {
+        config.headers['X-CSRFToken'] = csrf;
+      }
+      return config;
+    });
+    return instance;
   },
 };
 
