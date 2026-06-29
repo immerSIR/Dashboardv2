@@ -269,10 +269,10 @@ Legend — Auth: **none** (public), **Bearer** (any authenticated user), or a sp
 
 | Method · Path | Auth | Notes |
 |---|---|---|
-| `GET·POST /MapApi/collaboration/` | Bearer | List (scoped to user / incidents they lead). Filters `?status=&role=&incident_id=`. POST `{incident, role(contributor|observer), motivation?, end_date?}` — `leader` rejected; duplicate → `400`. **Do NOT send `user` — it's server-set to the authenticated requester (read-only); sending a bad `user` previously caused `400 Invalid pk`.** |
+| `GET·POST /MapApi/collaboration/` | Bearer | List. **`?scope=mine\|received\|all`** *(2026, default `all`)*: **`mine`** = your own collaborations (the "Mes collaborations" tab — one card per incident with **your** role); **`received`** = requests from others on incidents **you lead** (the "Demandes" tab); **`all`** = both. Other filters `?status=&role=&incident_id=`. POST `{incident, role(contributor\|observer), motivation?, end_date?}` — `leader` rejected; duplicate → `400`. **Do NOT send `user` — it's server-set to the authenticated requester (read-only); sending a bad `user` previously caused `400 Invalid pk`.** |
 | `GET·PATCH·DELETE /MapApi/collaboration/<pk>/` | Bearer | Collaboration RUD (own or led; staff see all). |
 | `POST /MapApi/collaborations/bulk-request/` | Bearer | `{requests:[{incident_id, role, motivation, end_date}, ...]}` → `201`/`207`, per-item `created`/`errors`. |
-| `GET /MapApi/collaborations/dashboard/` | Bearer | Enriched list. Filters `?status=all|in-progress|completed|pending|accepted|declined`, `?date_from=&date_to=&search=`. |
+| `GET /MapApi/collaborations/dashboard/` | Bearer | Enriched list. **`?scope=mine\|received\|all`** *(2026, default `all`)* — same meaning as on `/collaboration/` (use `mine` for "Mes collaborations", `received` for "Demandes"). Filters `?status=all\|in-progress\|completed\|pending\|accepted\|declined`, `?date_from=&date_to=&search=`. |
 | `POST /MapApi/accept-collaboration/` · `POST /MapApi/collaborations/accept/` | Bearer + leader | `{collaboration_id}` → `accepted`. |
 | `POST /MapApi/decline/` | Bearer + leader | `{collaboration_id}` → `declined`, emails requester. |
 | `POST /MapApi/collaboration/<id>/<action>/` | Bearer + leader | `<action>` = `accept`/`reject`. |
