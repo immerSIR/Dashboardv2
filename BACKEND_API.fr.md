@@ -31,7 +31,8 @@ JWT via `rest_framework_simplejwt`. Configuré dans `backend/settings.py` :
 
 - **Durée de vie du token d'accès : 90 jours.** Token de rafraîchissement : 1 jour. Les tokens ne sont **ni** renouvelés (rotation) **ni** mis sur liste noire. (Ce token d'accès à longue durée de vie explique pourquoi le frontend peut conserver une session longtemps dans `sessionStorage`.)
 - `USERNAME_FIELD = 'email'` → **la connexion utilise `email`, pas `username`.**
-- La classe d'authentification par défaut est `JWTAuthentication` ; il n'y a **pas** de `DEFAULT_PERMISSION_CLASSES` global, donc une vue sans `permission_classes` est de fait **publique**.
+- La classe d'authentification par défaut est `CookieJWTAuthentication` (**Bearer d'abord**, puis repli sur le cookie httpOnly) ; il n'y a **pas** de `DEFAULT_PERMISSION_CLASSES` global, donc une vue sans `permission_classes` est de fait **publique**.
+- **Le dashboard s'authentifie avec `Authorization: Bearer` (token en `sessionStorage`), pas par cookie.** Les cookies httpOnly ont été essayés mais ne peuvent pas fonctionner ici : le frontend et le backend sont sur des sites différents (`*.up.railway.app` est un suffixe public, et le dev local tourne sur `localhost`), donc le cookie d'auth est tiers et le navigateur le bloque. Le `/login/` renvoie `access`/`refresh` dans le corps précisément pour cette raison. Ne pas réintroduire l'auth par cookie seul, sauf si le FE et le BE sont servis en same-site (domaine racine commun) ou derrière un proxy same-origin.
 
 ### Flux de connexion principal (utilisé par le dashboard)
 
