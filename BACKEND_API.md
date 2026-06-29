@@ -268,7 +268,7 @@ Legend — Auth: **none** (public), **Bearer** (any authenticated user), or a sp
 
 | Method · Path | Auth | Notes |
 |---|---|---|
-| `GET·POST /MapApi/collaboration/` | Bearer | List (scoped to user / incidents they lead). Filters `?status=&role=&incident_id=`. POST `{incident, role(contributor|observer), motivation?, end_date?}` — `leader` rejected; duplicate → `400`. |
+| `GET·POST /MapApi/collaboration/` | Bearer | List (scoped to user / incidents they lead). Filters `?status=&role=&incident_id=`. POST `{incident, role(contributor|observer), motivation?, end_date?}` — `leader` rejected; duplicate → `400`. **Do NOT send `user` — it's server-set to the authenticated requester (read-only); sending a bad `user` previously caused `400 Invalid pk`.** |
 | `GET·PATCH·DELETE /MapApi/collaboration/<pk>/` | Bearer | Collaboration RUD (own or led; staff see all). |
 | `POST /MapApi/collaborations/bulk-request/` | Bearer | `{requests:[{incident_id, role, motivation, end_date}, ...]}` → `201`/`207`, per-item `created`/`errors`. |
 | `GET /MapApi/collaborations/dashboard/` | Bearer | Enriched list. Filters `?status=all|in-progress|completed|pending|accepted|declined`, `?date_from=&date_to=&search=`. |

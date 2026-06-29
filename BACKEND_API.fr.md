@@ -268,7 +268,7 @@ Légende — Auth : **aucune** (public), **Bearer** (tout utilisateur authentifi
 
 | Méthode · Chemin | Auth | Notes |
 |---|---|---|
-| `GET·POST /MapApi/collaboration/` | Bearer | Liste (limitée à l'utilisateur / aux incidents qu'il dirige). Filtres `?status=&role=&incident_id=`. POST `{incident, role(contributor|observer), motivation?, end_date?}` — `leader` rejeté ; doublon → `400`. |
+| `GET·POST /MapApi/collaboration/` | Bearer | Liste (limitée à l'utilisateur / aux incidents qu'il dirige). Filtres `?status=&role=&incident_id=`. POST `{incident, role(contributor|observer), motivation?, end_date?}` — `leader` rejeté ; doublon → `400`. **Ne PAS envoyer `user` — il est forcé côté serveur à l'utilisateur authentifié (lecture seule) ; envoyer un mauvais `user` provoquait `400 Invalid pk`.** |
 | `GET·PATCH·DELETE /MapApi/collaboration/<pk>/` | Bearer | RUD de collaboration (la sienne ou dirigée ; le staff voit tout). |
 | `POST /MapApi/collaborations/bulk-request/` | Bearer | `{requests:[{incident_id, role, motivation, end_date}, ...]}` → `201`/`207`, `created`/`errors` par élément. |
 | `GET /MapApi/collaborations/dashboard/` | Bearer | Liste enrichie. Filtres `?status=all|in-progress|completed|pending|accepted|declined`, `?date_from=&date_to=&search=`. |
