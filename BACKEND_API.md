@@ -263,7 +263,7 @@ Legend — Auth: **none** (public), **Bearer** (any authenticated user), or a sp
 | `POST /MapApi/incidents/<id>/toggle-public/` | Bearer (org_admin/bureau on own incident, or staff) | Flips `is_public`. |
 | `GET /MapApi/incidents/<id>/prediction/` | Bearer | The incident's `Prediction`. `404` if none. |
 | `POST /MapApi/incidents/<id>/prediction/retry/` | Bearer + `IsSuperAdmin` | Re-runs AI analysis (`202`). |
-| `GET·POST /MapApi/incidents/<id>/chat/` | Bearer | AI assistant grounded on the prediction. GET → `{history:[{role,content,created_at,user_id}]}`; POST `{message}` → `{message, history}`. `502` if the model service errors. |
+| `GET·POST /MapApi/incidents/<id>/chat/` | Bearer | AI assistant grounded on the prediction (history is **per logged-in user**). GET → `{history:[{id,role,content,created_at,user_id}]}`. **Cursor pagination** *(2026)*: no params = full history (chronological); **`?limit=N`** (1–100) = the latest N messages (chronological order) + **`has_more`** + **`next_before`**; for older messages on scroll-up, call again with **`?before=<oldest loaded message id>`** (`+limit`). POST `{message}` → `{message, history}`. `502` if the model service errors. |
 
 ### 6.4 Collaborations
 

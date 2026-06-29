@@ -263,7 +263,7 @@ Légende — Auth : **aucune** (public), **Bearer** (tout utilisateur authentifi
 | `POST /MapApi/incidents/<id>/toggle-public/` | Bearer (org_admin/bureau sur son incident, ou staff) | Inverse `is_public`. |
 | `GET /MapApi/incidents/<id>/prediction/` | Bearer | La `Prediction` de l'incident. `404` si aucune. |
 | `POST /MapApi/incidents/<id>/prediction/retry/` | Bearer + `IsSuperAdmin` | Relance l'analyse IA (`202`). |
-| `GET·POST /MapApi/incidents/<id>/chat/` | Bearer | Assistant IA ancré sur la prédiction. GET → `{history:[{role,content,created_at,user_id}]}` ; POST `{message}` → `{message, history}`. `502` si le service du modèle échoue. |
+| `GET·POST /MapApi/incidents/<id>/chat/` | Bearer | Assistant IA ancré sur la prédiction (historique **par utilisateur connecté**). GET → `{history:[{id,role,content,created_at,user_id}]}`. **Pagination curseur** *(2026)* : sans paramètre = historique complet (chronologique) ; **`?limit=N`** (1–100) = les N messages les plus récents (ordre chronologique) + **`has_more`** + **`next_before`** ; pour les plus anciens (scroll vers le haut), rappeler avec **`?before=<id du plus ancien message chargé>`** (`+limit`). POST `{message}` → `{message, history}`. `502` si le service du modèle échoue. |
 
 ### 6.4 Collaborations
 
