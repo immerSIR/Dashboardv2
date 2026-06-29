@@ -151,7 +151,7 @@ Read-only enrichments: `organisation_name`, `organisation_id`, `user_full_name`,
 - **`sender` / `receiver`** *(2026)* — explicit parties of a collaboration request, both `{id, name, email, organisation_id, organisation_name}`: **`sender`** (émetteur) = the org requesting to join (`collaboration.user`); **`receiver`** (récepteur) = the leader who receives the request (`incident.taken_by`), or `null` if none yet. Use these in the "demande" tab so the logged-in org can tell whether it sent or received a request (don't infer from `user` alone).
 
 ### IncidentTask (`IncidentTaskSerializer`, `fields=__all__`)
-`id`, `incident` (FK, from URL), `title` (required), `description`, `start_date`, `end_date` (required; start ≤ end), `state` (enum), `proof_image`, `proof_video` (required when `state=done`), `failure_reason` (required when `state=failed`), `assigned_to` (FK User), `created_by` (auto), **`is_confirmed`** (read-only; auto-true if leader created it; only confirmed tasks count toward incident `progress`), `created_at`/`updated_at` (auto).
+`id`, `incident` (**read-only — injected from the URL; do NOT send it in the body**), `title` (required), `description`, `start_date`, `end_date` (required; start ≤ end), `state` (enum), `proof_image`, `proof_video` (required when `state=done`), `failure_reason` (required when `state=failed`), `assigned_to` (FK User — **optional**; omit for an unassigned task, or send a **valid agent UUID** — never a legacy int id), `created_by` (auto = current user), **`is_confirmed`** (read-only; auto-true if leader created it; only confirmed tasks count toward incident `progress`), `created_at`/`updated_at` (auto).
 
 ### PartnerSuggestion (`PartnerSuggestionSerializer`)
 `id`, `incident` (FK), `suggested_by` (auto = current user), `suggested_partner` (FK User — optional if `suggested_organisation` sent), `suggested_organisation` (write-only org id → resolves to that org's admin/bureau user), `suggested_role` (`contributor`|`observer`), `justification` (required), `status` (read-only enum). Read-only names: `incident_title`, `suggested_by_name`, `suggested_by_organisation`, `suggested_partner_name`, `suggested_partner_organisation`. Unique `(incident, suggested_partner)`.
@@ -281,7 +281,7 @@ Legend — Auth: **none** (public), **Bearer** (any authenticated user), or a sp
 
 | Method · Path | Auth | Notes |
 |---|---|---|
-| `GET·POST /MapApi/incidents/<id>/tasks/` | Bearer + `IsIncidentLeaderOrContributor` | List / create. Body `{title, start_date, end_date, description?, assigned_to?, state?}`. Leader-created tasks auto-`is_confirmed`. |
+| `GET·POST /MapApi/incidents/<id>/tasks/` | Bearer + `IsIncidentLeaderOrContributor` | List / create. Body `{title, start_date, end_date, description?, assigned_to?, state?}`. **`incident` comes from the URL — don't send it** (*2026*: it's read-only; sending nothing avoids the old `400 "incident may not be null"`). **`assigned_to` is optional — omit it or send a valid agent UUID, never a legacy int** (`"6"` → `400 Invalid pk`). Leader-created tasks auto-`is_confirmed`. |
 | `GET·PUT·PATCH·DELETE /MapApi/incidents/<id>/tasks/<pk>/` | read: any collaborator; write: leader | Task RUD. |
 | `POST /MapApi/incidents/<id>/tasks/<pk>/complete/` | Bearer + `IsIncidentLeader` | multipart `proof_image` and/or `proof_video` (≥1 required) → `state=done`. |
 | `POST /MapApi/incidents/<id>/tasks/<pk>/fail/` | Bearer + `IsIncidentLeader` | `{failure_reason}` → `state=failed`. |
