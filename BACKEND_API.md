@@ -147,7 +147,7 @@ Write-only on create: `password`, `incident_preferences` (list, for élus).
 
 ### Collaboration (`CollaborationSerializer` / `CollaborationEnrichedSerializer`)
 `id`, `incident` (FK), `user` (FK — the collaborating user/org rep), `role` (enum), `status` (enum, read-only — set via accept/decline), `motivation`, `end_date` (must be future), `other_option`, `created_at` (auto). Unique together `(incident, user)`.
-Read-only enrichments: `organisation_name`, `organisation_id`, `user_full_name`, `user_email`, `incident_title`, `incident_details` (full Incident), `prediction_details` (full Prediction). The dashboard serializer adds `user_role`, `incident_description/zone/etat/progress`, `start_date` (=created_at), `participants_count`.
+Read-only enrichments: `organisation_name`, `organisation_id`, `user_full_name`, `user_email`, `incident_title`, **`incident_photo`** *(2026)*, **`incident_thumbnail`** *(2026)* (incident image URLs, for the collaboration cards), `incident_details` (full Incident), `prediction_details` (full Prediction). The dashboard serializer adds `user_role`, `incident_description/zone/etat/progress`, **`incident_photo`/`incident_thumbnail`**, `start_date` (=created_at), `participants_count`.
 - **`sender` / `receiver`** *(2026)* — explicit parties of a collaboration request, both `{id, name, email, organisation_id, organisation_name}`: **`sender`** (émetteur) = the org requesting to join (`collaboration.user`); **`receiver`** (récepteur) = the leader who receives the request (`incident.taken_by`), or `null` if none yet. Use these in the "demande" tab so the logged-in org can tell whether it sent or received a request (don't infer from `user` alone).
 
 ### IncidentTask (`IncidentTaskSerializer`, `fields=__all__`)
