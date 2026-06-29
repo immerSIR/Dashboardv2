@@ -135,7 +135,7 @@ Write-only on create: `password`, `incident_preferences` (list, for élus).
 `id`, `name` (unique), `acronym`, `subdomain` (unique), `is_premium`, `logo` (image url), `organisation_type` (enum), `activity_sector` (enum), `intervention_country` (enum), `partner_status` (enum, default `active`), `description`, `phone`, `website_url`, `primary_color`/`secondary_color`/`background_color` (hex strings), `created_at` (auto), **`members_count`** (read-only). `OrganisationMemberSerializer` (used by member endpoints) exposes a user as: `id, email, first_name, last_name, phone, organisation_member, organisation_name, org_role, agent_code, is_active, date_joined`.
 
 ### Incident (`IncidentSerializer` write / `IncidentGetSerializer` read)
-`id`, `title`, **`zone`** (string, **required**), `description`, `photo` (image), `video` (file), `audio` (file), `lattitude` (string), `longitude` (string), `etat` (enum, default `declared`), `user_id` (FK → reporter User), `category_id` (FK → Category), `indicateur_id` (FK → Indicateur), `category_ids` (M2M Category), `slug`, `taken_by` (FK → leader User, nullable), `take_in_charge_mode` (enum/null), `resolution_start_date`, `resolution_end_date` (dates; both required to close), **`progress`** (0–100, read-only, auto from confirmed tasks), `is_public` (default true), `is_deleted` (soft-delete flag), `created_at` (auto). Read-only computed: `reported_by_agent` (bool — reporter is a field agent).
+`id`, `title`, **`zone`** (string, **required**), `description`, `photo` (image), **`thumbnail`** (image URL — **auto-generated** ~320px from `photo` on save, read-only; use it for the incidents tab instead of the full `photo`), `video` (file), `audio` (file), `lattitude` (string), `longitude` (string), `etat` (enum, default `declared`), `user_id` (FK → reporter User), `category_id` (FK → Category), `indicateur_id` (FK → Indicateur), `category_ids` (M2M Category), `slug`, `taken_by` (FK → leader User, nullable), `take_in_charge_mode` (enum/null), `resolution_start_date`, `resolution_end_date` (dates; both required to close), **`progress`** (0–100, read-only, auto from confirmed tasks), `is_public` (default true), `is_deleted` (soft-delete flag), `created_at` (auto). Read-only computed: `reported_by_agent` (bool — reporter is a field agent).
 - **`IncidentGetSerializer`** nests the full `user_id` (User) and `category_id` (Category) objects; used by most list endpoints.
 - The OneToOne AI `prediction` is accessed via its own endpoints (see §6.7), not embedded here.
 - **Acting organisations (list + detail)** *(2026)* — both serializers now expose, so another org sees who is already working on an incident **before** opening it:
@@ -237,7 +237,7 @@ Legend — Auth: **none** (public), **Bearer** (any authenticated user), or a sp
 
 | Method · Path | Auth | Notes |
 |---|---|---|
-| `GET·POST /MapApi/incident/` | none | Paginated list (`IncidentGetSerializer`) / **create**. Create: `IncidentSerializer` fields, **`zone` required**, multipart for `photo/video/audio`. Side effects: get-or-create Zone, +1 reporter points, kicks off AI `Prediction` if a `photo` exists. |
+| `GET·POST /MapApi/incident/` | none | Paginated list **(20/page** by default; `?page=&page_size=`, max 100) (`IncidentGetSerializer`, incl. `thumbnail`) / **create**. Create: `IncidentSerializer` fields, **`zone` required**, multipart for `photo/video/audio`. Side effects: get-or-create Zone, +1 reporter points, kicks off AI `Prediction` if a `photo` exists. |
 | `GET·PUT·DELETE /MapApi/incident/<id>` *(no slash)* | GET/PUT none; **DELETE** `IsSuperAdminOrOrgOwnIncident` | Retrieve / full update / **soft-delete** (`is_deleted=true`, `204`). PUT sends status emails when `etat` becomes `resolved`/`in_progress` (PUT requires an `etat` key in body). |
 | `GET /MapApi/incidentByZone/<zone>/` | none | All incidents for a numeric zone (plain list). |
 | `GET /MapApi/my-incidents/` | Bearer | Incidents reported by current user. |
@@ -374,6 +374,7 @@ Django Channels over the same host (`wss://` in prod, `ws://` local). **Auth = t
 | `wss://<api>/ws/notifications/` | `{event:'notification', id, message, read, colaboration, created_at}` — the connected user's notifications (who did what), in real time. |
 | `wss://<api>/ws/incidents/<id>/discussion/` | `{event:'discussion_message', id, incident, collaboration, sender, message, created_at}` — new discussion messages on the incident. |
 | `wss://<api>/ws/incidents/<id>/tasks/` | `{event:'task_created'|'task_updated', id, incident, title, state, assigned_to, updated_at}` — task changes on the incident. |
+| `wss://<api>/ws/collaborations/` *(2026)* | `{event:'collaboration_created'|'collaboration_updated', id, incident, status, role, sender, created_at}` — the connected user's collaborations in real time, pushed to both the **sender** and the **incident leader** (who receives requests). Subscribe on the collaboration tab/requests page for instant updates. |
 
 Frontend helper: `src/hooks/useWebSocket.js` (auto-reconnect). Used in `Header` (notifications) and `CollaborationDetail` (discussion + tasks) to trigger an instant refresh; HTTP polling remains as a fallback.
 
