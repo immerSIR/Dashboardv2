@@ -356,6 +356,18 @@ Standard list/create at the collection and retrieve/update/delete at `/<id>` (no
 
 `POST /MapApi/ivr/webhook/`, `ivr/select-zone/`, `ivr/select-category/`, `ivr/record-description/`, `ivr/process-recording/`, `ivr/recording-status/` are Twilio webhooks returning TwiML XML (citizens report incidents by phone; auto-creates a User + Incident from the call). Dashboard-relevant read-only: `GET /MapApi/ivr/calls/` and `GET /MapApi/ivr/calls/<call_id>/`.
 
+### 6.14 WebSockets — real-time *(2026)*
+
+Django Channels over the same host (`wss://` in prod, `ws://` local). **Auth = the httpOnly access cookie** (sent automatically on the handshake; or `?token=<jwt>` for mobile). Connections from a disallowed Origin are rejected. Server pushes JSON; the client never needs to send anything.
+
+| WS path | Pushes |
+|---|---|
+| `wss://<api>/ws/notifications/` | `{event:'notification', id, message, read, colaboration, created_at}` — the connected user's notifications (who did what), in real time. |
+| `wss://<api>/ws/incidents/<id>/discussion/` | `{event:'discussion_message', id, incident, collaboration, sender, message, created_at}` — new discussion messages on the incident. |
+| `wss://<api>/ws/incidents/<id>/tasks/` | `{event:'task_created'|'task_updated', id, incident, title, state, assigned_to, updated_at}` — task changes on the incident. |
+
+Frontend helper: `src/hooks/useWebSocket.js` (auto-reconnect). Used in `Header` (notifications) and `CollaborationDetail` (discussion + tasks) to trigger an instant refresh; HTTP polling remains as a fallback.
+
 ---
 
 ## 7. Frontend integration notes
