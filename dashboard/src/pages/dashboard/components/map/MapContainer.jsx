@@ -10,6 +10,19 @@ import './map.css';
 // Token Mapbox depuis les variables d'environnement
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
+// Graine numérique déterministe à partir d'un id. Les ids sont des UUID (chaînes) :
+// les passer directement à Math.sin/cos donnerait NaN (→ Marker LngLat invalide,
+// crash de la carte). On hashe la chaîne en un petit entier stable.
+const seedFromId = (id) => {
+  if (typeof id === 'number' && Number.isFinite(id)) return id;
+  const s = String(id ?? '');
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) {
+    h = (h * 31 + s.charCodeAt(i)) % 100000;
+  }
+  return h;
+};
+
 // Détermine la sévérité d'un incident à partir de base_severity (0 à 10) ou de ses badges
 const getSeverity = (project) => {
   const baseSeverity = project.base_severity ?? project.incident_details?.prediction_details?.base_severity;
@@ -203,7 +216,7 @@ export const MapContainer = ({ incidents = [], isLoading = false }) => {
     const latVal = inc.lattitude !== undefined ? inc.lattitude : inc.latitude;
     const lat = parseFloat(latVal);
     const lng = parseFloat(inc.longitude);
-    const hasValidCoords = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+    const hasValidCoords = Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0;
 
     let finalLat = lat;
     let finalLng = lng;
@@ -211,10 +224,11 @@ export const MapContainer = ({ incidents = [], isLoading = false }) => {
 
     if (!hasValidCoords) {
       hasFallbackCoords = true;
-      // Ajout d'une petite variation déterministe basée sur l'ID de l'incident pour éviter la superposition parfaite
-      const offsetId = inc.id || 0;
-      finalLat = DEFAULT_MALI_LAT + (Math.sin(offsetId) * 0.005);
-      finalLng = DEFAULT_MALI_LNG + (Math.cos(offsetId) * 0.005);
+      // Variation déterministe (graine numérique dérivée de l'UUID) pour éviter la
+      // superposition parfaite des incidents sans coordonnées.
+      const offsetSeed = seedFromId(inc.id);
+      finalLat = DEFAULT_MALI_LAT + (Math.sin(offsetSeed) * 0.005);
+      finalLng = DEFAULT_MALI_LNG + (Math.cos(offsetSeed) * 0.005);
     }
 
     return {
@@ -281,9 +295,11 @@ export const MapContainer = ({ incidents = [], isLoading = false }) => {
       },
       { lng: 0, lat: 0 }
     );
+    const lng = avg.lng / validIncidents.length;
+    const lat = avg.lat / validIncidents.length;
     return {
-      lng: avg.lng / validIncidents.length,
-      lat: avg.lat / validIncidents.length
+      lng: Number.isFinite(lng) ? lng : -8.0,
+      lat: Number.isFinite(lat) ? lat : 12.65
     };
   })();
 
@@ -326,6 +342,10 @@ export const MapContainer = ({ incidents = [], isLoading = false }) => {
         >
           {/* Markers d'incidents */}
           {!isLoading && validIncidents.map((incident) => {
+            // Garde-fou : jamais de Marker avec des coordonnées non finies (mapbox crash).
+            if (!Number.isFinite(incident._lng) || !Number.isFinite(incident._lat)) {
+              return null;
+            }
             const colorClass = getMarkerColorClass(incident, currentUserId);
             return (
               <Marker
