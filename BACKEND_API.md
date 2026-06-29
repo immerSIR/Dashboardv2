@@ -113,8 +113,8 @@ All values are the raw strings stored/returned by the API (from `models.py`).
 | **Prediction status** | `Prediction.status` | `pending`, `processing`, `completed`, `completed_with_warning`, `failed` |
 | **Report status** | `Rapport.statut` | `new`, `in_progress`, `edit`, `canceled` |
 | **Chat role** | `ChatHistory.role` | `user`, `assistant`, `system` |
-| **Org type** | `Organisation.organisation_type` | `ngo`, `international_organisation`, `governmental`, `civil_society` |
-| **Org activity sector** | `Organisation.activity_sector` | `humanitarian`, `humanitarian_coordination`, `development`, `child_protection`, `health`, `nutrition_food_security`, `development_humanitarian` |
+| **Org type** | `Organisation.organisation_type` | `ngo`=ONG, `international_organisation`=Organisation internationale, `un_agency`=Agence UN, `public_institution`=Institution publique, `local_authority`=Collectivité territoriale, `association_cso`=Association / OSC, `private_sector`=Secteur privé, `project_program`=Projet / Programme, `community_structure`=Structure communautaire, `other`=Autre |
+| **Org activity sector** | `Organisation.activity_sector` | `environment`=Environnement, `sanitation`=Assainissement, `water_wash`=Eau / WASH, `health`=Santé, `food_security`=Sécurité alimentaire, `protection`=Protection, `humanitarian`=Humanitaire, `development`=Développement, `governance`=Gouvernance, `education`=Éducation, `technology_data`=Technologie / Données, `multisector`=Multisectoriel, `other`=Autre |
 | **Intervention country** | `Organisation.intervention_country` | `senegal`, `mali`, `guinea`, `burkina_faso`, `niger`, `cote_divoire`, `mauritania` |
 | **Partner status** | `Organisation.partner_status` | `active`, `inactive` |
 | **Chat attachment ext** | `DiscussionMessage.attachment` | `pdf`, `doc`, `docx`, `xls`, `xlsx` only |
@@ -132,7 +132,7 @@ Write-only on create: `password`, `incident_preferences` (list, for élus).
 > Two org concepts coexist: `organisation` (legacy free string) and `organisation_member` (real FK to `Organisation`). Prefer `organisation_member` / `organisation_name`.
 
 ### Organisation (`OrganisationSerializer`, `fields=__all__`)
-`id`, `name` (unique), `acronym`, `subdomain` (unique), `is_premium`, `logo` (image url), `organisation_type` (enum), `activity_sector` (enum), `intervention_country` (enum), `partner_status` (enum, default `active`), `description`, `phone`, `website_url`, `primary_color`/`secondary_color`/`background_color` (hex strings), `created_at` (auto), **`members_count`** (read-only). `OrganisationMemberSerializer` (used by member endpoints) exposes a user as: `id, email, first_name, last_name, phone, organisation_member, organisation_name, org_role, agent_code, is_active, date_joined`.
+`id`, `name` (unique), `acronym`, `subdomain` (unique), `is_premium`, `logo` (image url), `organisation_type` (enum), `activity_sector` (enum), `intervention_country` (enum), `partner_status` (enum, default `active`), `description`, `phone`, `website_url`, `primary_color`/`secondary_color`/`background_color` (hex strings), `created_at` (auto), **`members_count`** + **`incidents_taken_count`** (read-only — incidents whose leader `taken_by` belongs to the org). `OrganisationMemberSerializer` (used by member endpoints) exposes a user as: `id, email, first_name, last_name, phone, organisation_member, organisation_name, org_role, agent_code, is_active, date_joined`.
 
 ### Incident (`IncidentSerializer` write / `IncidentGetSerializer` read)
 `id`, `title`, **`zone`** (string, **required**), `description`, `photo` (image), **`thumbnail`** (image URL — **auto-generated** ~320px from `photo` on save, read-only; use it for the incidents tab instead of the full `photo`), `video` (file), `audio` (file), `lattitude` (string), `longitude` (string), `etat` (enum, default `declared`), `user_id` (FK → reporter User), `category_id` (FK → Category), `indicateur_id` (FK → Indicateur), `category_ids` (M2M Category), `slug`, `taken_by` (FK → leader User, nullable), `take_in_charge_mode` (enum/null), `resolution_start_date`, `resolution_end_date` (dates; both required to close), **`progress`** (0–100, read-only, auto from confirmed tasks), `is_public` (default true), `is_deleted` (soft-delete flag), `created_at` (auto). Read-only computed: `reported_by_agent` (bool — reporter is a field agent).
@@ -222,7 +222,8 @@ Legend — Auth: **none** (public), **Bearer** (any authenticated user), or a sp
 | `GET /MapApi/citizen/` | none | Users with `user_type=citizen` (page size 10). |
 | `GET /MapApi/updatePoint/` | none | Recomputes `points` for all users (admin maintenance). |
 | `GET /MapApi/tenant-config/` | none | Per-subdomain theming: `{name, subdomain, logo_url, primary_color, secondary_color, background_color, is_premium}`. Resolves org from request subdomain. |
-| `GET·POST /MapApi/organisations/` | none | List (paginated) / create organisation. |
+| `GET·POST /MapApi/organisations/` | GET none; **POST** Super Admin | List (paginated, **newest-first**) / create. **Create requires `name` + unique `subdomain`.** List filters: `?search=` (name/acronym/subdomain/country), `?activity_sector=`, `?organisation_type=`, `?partner_status=active\|inactive`. Each row has `members_count` + `incidents_taken_count`. |
+| `GET /MapApi/organisations/stats/` *(2026)* | none | Dashboard cards: `{total, active, inactive, incidents_taken_total}`. |
 | `GET·PUT·PATCH·DELETE /MapApi/organisations/<pk>/` | none | Organisation RUD. |
 | `GET /MapApi/organisations/<pk>/detail/` | none | Org + `stats`: `{member_count, field_agents_count, bureau_agents_count, admins_count, incident_count, resolved_incident_count}`. |
 | `GET /MapApi/organisations/<pk>/members/` | Bearer + org_admin/bureau or staff | List members (`OrganisationMemberSerializer`). |
