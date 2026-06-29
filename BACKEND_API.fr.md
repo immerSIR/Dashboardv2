@@ -372,7 +372,7 @@ Django Channels sur le même hôte (`wss://` en prod, `ws://` en local). **Auth 
 
 | Chemin WS | Push |
 |---|---|
-| `wss://<api>/ws/notifications/` | `{event:'notification', id, message, read, colaboration, created_at}` — notifications de l'utilisateur connecté (qui a fait quoi), en temps réel. |
+| `wss://<api>/ws/notifications/` | `{event:'notification', id, message, read, colaboration, incident, link, created_at}` — notifications de l'utilisateur connecté en temps réel. **`link`** = `{type:'incident'\|'collaboration', incident_id, collaboration_id?, url}` ou `null` — où rediriger au clic sur la notification (même champ `link` sur le REST `GET /notifications/`). |
 | `wss://<api>/ws/incidents/<id>/discussion/` | `{event:'discussion_message', id, incident, collaboration, sender, message, created_at}` — nouveaux messages de discussion de l'incident. |
 | `wss://<api>/ws/incidents/<id>/tasks/` | `{event:'task_created'|'task_updated', id, incident, title, state, assigned_to, updated_at}` — changements de tâches de l'incident. |
 | `wss://<api>/ws/collaborations/` *(2026)* | `{event:'collaboration_created'|'collaboration_updated', id, incident, status, role, sender, created_at}` — collaborations de l'utilisateur connecté en temps réel, poussées à l'**émetteur** ET au **leader de l'incident** (qui reçoit les demandes). À souscrire sur l'onglet collaboration / demandes pour des mises à jour instantanées. |

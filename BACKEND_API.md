@@ -372,7 +372,7 @@ Django Channels over the same host (`wss://` in prod, `ws://` local). **Auth = t
 
 | WS path | Pushes |
 |---|---|
-| `wss://<api>/ws/notifications/` | `{event:'notification', id, message, read, colaboration, created_at}` — the connected user's notifications (who did what), in real time. |
+| `wss://<api>/ws/notifications/` | `{event:'notification', id, message, read, colaboration, incident, link, created_at}` — the connected user's notifications in real time. **`link`** = `{type:'incident'\|'collaboration', incident_id, collaboration_id?, url}` or `null` — where to redirect when the user clicks the notification (same `link` field is on the REST `GET /notifications/`). |
 | `wss://<api>/ws/incidents/<id>/discussion/` | `{event:'discussion_message', id, incident, collaboration, sender, message, created_at}` — new discussion messages on the incident. |
 | `wss://<api>/ws/incidents/<id>/tasks/` | `{event:'task_created'|'task_updated', id, incident, title, state, assigned_to, updated_at}` — task changes on the incident. |
 | `wss://<api>/ws/collaborations/` *(2026)* | `{event:'collaboration_created'|'collaboration_updated', id, incident, status, role, sender, created_at}` — the connected user's collaborations in real time, pushed to both the **sender** and the **incident leader** (who receives requests). Subscribe on the collaboration tab/requests page for instant updates. |
