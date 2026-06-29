@@ -230,7 +230,9 @@ Légende — Auth : **aucune** (public), **Bearer** (tout utilisateur authentifi
 | `POST /MapApi/organisations/<pk>/members/add/` | Bearer + org_admin/bureau ou staff | `{user_id, org_role}` → rattache un utilisateur existant. Les nouveaux agents de terrain renvoient un `initial_pin` unique. |
 | `PATCH·DELETE /MapApi/organisations/<pk>/members/<user_id>/` | Bearer + org_admin/bureau ou staff | Modifie (`email, first_name, last_name, phone, org_role`) / retire un membre. |
 | `POST /MapApi/organisations/<pk>/agents/create/` | Bearer + org_admin/bureau ou staff | Crée un agent de terrain en un appel `{first_name,last_name,email,phone,address?}` → renvoie `initial_pin`, `must_change_pin`, envoie les identifiants par email. |
-| `POST /MapApi/organisations/<pk>/staff/create/` | Bearer + org_admin ou staff | Crée du personnel `{first_name,last_name,email,org_role(org_admin|bureau_agent),phone?,address?}` → mot de passe temporaire envoyé par email, `must_change_password:true`. |
+| `POST /MapApi/organisations/<pk>/staff/create/` | Bearer + org_admin ou staff | Crée du personnel `{first_name,last_name,email,org_role(org_admin|bureau_agent),phone?,address?}` → renvoie **`temp_password`** (à afficher pour que l'admin le communique — la délivrabilité de l'email n'est pas garantie), plus `email_sent`, `must_change_password:true`. |
+| `GET /MapApi/agents/` *(2026)* | Bearer | Liste globale des agents (membres d'org avec rôle), **plus récents d'abord**, paginée. Filtres : `?search=` (nom/email/org), `?role=org_admin\|bureau_agent\|field_agent`, `?status=active\|inactive`. Lignes = `OrganisationMemberSerializer`. |
+| `GET /MapApi/agents/stats/` *(2026)* | Bearer | Cartes du dashboard agents : `{total, active, admins, bureau_agents, field_agents}`. |
 | `GET·POST /MapApi/elu/<id>` *(sans slash)* | aucune | Liste/crée des élus (`user_type=elu`) ; la création envoie les identifiants par email. |
 | `GET·POST /MapApi/elu/` | aucune | `EluToZone` : `POST {elu, zone}` rattache une zone à un élu. |
 
@@ -333,7 +335,8 @@ Toutes publiques (`permission_classes=()`) ; renvoient des agrégats JSON, pas d
 
 | Méthode · Chemin | Auth | Notes |
 |---|---|---|
-| `GET /MapApi/notifications/` | Bearer | Notifications de l'utilisateur courant **où la collaboration liée est encore `pending`** (c.-à-d. les demandes de collaboration en attente). |
+| `GET /MapApi/notifications/` | Bearer | **Toutes** les notifications de l'utilisateur, **plus récentes d'abord**, paginées (20/page ; `?page=&page_size=`). Chacune a un **`link`** (cible de redirection, cf. §6.14). Filtre `?read=true\|false` (`?read=false` → `count` = nombre de non lues). |
+| `GET /MapApi/activity-feed/` *(2026)* | Bearer | Activité de la plateforme **hors organisation de l'utilisateur** (prises en charge / résolutions d'incidents, etc.), plus récente d'abord, paginée. Éléments : `{action, user_name, organisation_name, created_at, timeStamp}`. (Sourcé pour l'instant depuis `UserAction` — actions sur incidents ; collaborations/rapports/IA à ajouter.) |
 | `GET /MapApi/user_action/` | Bearer | Journal d'actions de l'utilisateur courant. |
 
 ### 6.11 Corbeille & actions groupées (super admin)
