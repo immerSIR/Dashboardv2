@@ -141,7 +141,8 @@ Write-only on create: `password`, `incident_preferences` (list, for élus).
 - **Acting organisations (list + detail)** *(2026)* — both serializers now expose, so another org sees who is already working on an incident **before** opening it:
   - **`taken_by_organisation`**: `{id, name}` of the org that took the incident in charge, or `null`.
   - **`taken_by_name`**: full name of the person who took charge (not just the `taken_by` id).
-  - **`acting_organisations`**: `[{id, name, relation}]` — every org active on the incident; `relation` ∈ `leader` (took charge) · `assigned` (super-admin org assignment accepted) · `collaborator` (collaboration accepted). Deduplicated, strongest relation wins.
+  - **`acting_organisations`**: `[{id, name, relation}]` — every org active on the incident; `relation` ∈ `leader` (took charge) · `assigned` (super-admin org assignment accepted) · `collaborator` (collaboration accepted). Deduplicated, strongest relation wins. (Only **accepted** collaborations appear here.)
+  - **`my_collaboration`** *(2026)*: the **viewer's own** collaboration request on this incident (or their org's), **whatever its status** — `{id, status(pending|accepted|declined), role, created_at, organisation_id, organisation_name}`, or `null` if none. Lets the list show *"j'ai demandé à collaborer — en attente"* on an incident already led by another org. **Only populated on `GET /incident/`** (the main list, which passes the request context); `null` on endpoints without viewer context.
 - **`org_assignments`**: `[{id, organisation_id, organisation_name, status, deadline}]` (pending/accepted/declined super-admin assignments).
 
 ### Collaboration (`CollaborationSerializer` / `CollaborationEnrichedSerializer`)

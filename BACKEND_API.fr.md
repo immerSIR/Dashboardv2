@@ -141,7 +141,8 @@ En écriture seule à la création : `password`, `incident_preferences` (liste, 
 - **Organisations actives (liste + détail)** *(2026)* — exposées par les deux sérialiseurs, pour qu'une autre organisation voie qui travaille déjà sur l'incident **avant** de l'ouvrir :
   - **`taken_by_organisation`** : `{id, name}` de l'organisation qui a pris l'incident en charge, ou `null`.
   - **`taken_by_name`** : nom complet de la personne qui a pris en charge (pas seulement l'id `taken_by`).
-  - **`acting_organisations`** : `[{id, name, relation}]` — toutes les organisations actives ; `relation` ∈ `leader` (a pris en charge) · `assigned` (assignation super-admin acceptée) · `collaborator` (collaboration acceptée). Dédupliqué, relation la plus forte conservée.
+  - **`acting_organisations`** : `[{id, name, relation}]` — toutes les organisations actives ; `relation` ∈ `leader` (a pris en charge) · `assigned` (assignation super-admin acceptée) · `collaborator` (collaboration acceptée). Dédupliqué, relation la plus forte conservée. (Seules les collaborations **acceptées** y figurent.)
+  - **`my_collaboration`** *(2026)* : la demande de collaboration **du viewer** (ou de son org) sur cet incident, **quel que soit son statut** — `{id, status(pending|accepted|declined), role, created_at, organisation_id, organisation_name}`, ou `null` si aucune. Permet d'afficher dans la liste « j'ai demandé à collaborer — en attente » sur un incident déjà dirigé par une autre org. **Rempli uniquement sur `GET /incident/`** (la liste principale, qui transmet le contexte de la requête) ; `null` ailleurs.
 - **`org_assignments`** : `[{id, organisation_id, organisation_name, status, deadline}]` (assignations super-admin pending/accepted/declined).
 
 ### Collaboration (`CollaborationSerializer` / `CollaborationEnrichedSerializer`)
