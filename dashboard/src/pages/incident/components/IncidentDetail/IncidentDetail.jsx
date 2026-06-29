@@ -289,7 +289,7 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
     participants: currentIncident.participants || [],
     extraParticipants: currentIncident.extraParticipants || 0,
     // Déterminer si l'utilisateur connecté est propriétaire de l'incident
-    isOwner: currentUserId ? currentIncident.taken_by === parseInt(currentUserId) : false,
+    isOwner: currentUserId ? currentIncident.taken_by === currentUserId : false,
     ...currentIncident
   } : null;
 
@@ -509,7 +509,7 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
       return;
     }
     runResolutionAction(
-      () => assignToOrganisationService(safeIncident.id, parseInt(selectedAssignOrgId, 10)),
+      () => assignToOrganisationService(safeIncident.id, selectedAssignOrgId),
       "Incident assigné à l'organisation."
     ).then(() => {
       setAssignOrgOpen(false);
@@ -765,7 +765,7 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
               suggested_organisation: org.id,
               suggested_role: roleStr,
               justification: commentStr,
-              user: currentUserId ? parseInt(currentUserId) : null
+              user: currentUserId ? currentUserId : null
             });
             console.log('Invitation envoyée:', result);
             successCount++;
@@ -887,7 +887,7 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
           incident: safeIncident.id,
           role: selfRole === 'contributeur' ? 'contributor' : selfRole === 'leader' ? 'leader' : 'observer',
           motivation: motif,
-          user: currentUserId ? parseInt(currentUserId) : null
+          user: currentUserId ? currentUserId : null
         };
 
         const result = await requestCollaborationService(collaborationData);

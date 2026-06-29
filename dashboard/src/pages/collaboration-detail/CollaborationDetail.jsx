@@ -990,7 +990,7 @@ export const CollaborationDetail = () => {
       description: newTaskDescription.trim() || null,
       start_date: newTaskStartDate || null,
       end_date: newTaskDeadline || null,
-      assigned_to: collaboration?.userId ? parseInt(collaboration.userId) : null
+      assigned_to: collaboration?.userId || null
     };
     setDraftTasks([...draftTasks, task]);
     setNewTaskTitle('');
@@ -1014,7 +1014,7 @@ export const CollaborationDetail = () => {
       await Promise.all(
         draftTasks.map(task =>
           createTaskService(incidentId, {
-            incident: parseInt(incidentId),
+            incident: incidentId,
             title: task.title,
             description: task.description || null,
             start_date: task.start_date || null,
@@ -1117,7 +1117,7 @@ export const CollaborationDetail = () => {
     setEditTaskSaving(true);
     try {
       await updateTaskService(incidentId, taskId, {
-        incident: parseInt(incidentId),
+        incident: incidentId,
         title: editTaskTitle.trim(),
         description: editTaskDescription.trim() || null,
         start_date: editTaskStartDate || null,

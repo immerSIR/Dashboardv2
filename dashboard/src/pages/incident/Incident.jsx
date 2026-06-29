@@ -57,7 +57,7 @@ const adaptIncidentData = (incident, currentUserId = null) => {
     // taken_by contient l'ID de l'utilisateur qui a pris en charge l'incident
     takenBy: incident.taken_by,
     // Déterminer si l'utilisateur connecté est propriétaire de l'incident
-    isOwner: currentUserId ? incident.taken_by === parseInt(currentUserId) : false
+    isOwner: currentUserId ? incident.taken_by === currentUserId : false
   };
 };
 

@@ -37,9 +37,10 @@ const getMarkerColorClass = (incident, currentUserId) => {
     } else {
       takenById = incident.taken_by || incident.takenBy;
     }
-    const takenBy = parseInt(takenById);
-    const me = parseInt(currentUserId);
-    if (!isNaN(takenBy) && !isNaN(me) && takenBy === me) {
+    // Les ids sont des UUID : comparaison en chaîne (plus de parseInt).
+    const takenBy = takenById != null ? String(takenById) : null;
+    const me = currentUserId != null ? String(currentUserId) : null;
+    if (takenBy && me && takenBy === me) {
       return 'resolved-mine'; // Vert
     }
     return 'resolved-others'; // Bleu
@@ -225,10 +226,10 @@ export const MapContainer = ({ incidents = [], isLoading = false }) => {
   }).filter((inc) => {
     // 2. Filtre d'attribution (Tous vs Mes incidents)
     if (ownershipFilter === 'mine') {
-      const takenById = inc?.taken_by;
-      const takenBy = takenById !== undefined ? parseInt(takenById) : null;
-      const me = parseInt(currentUserId);
-      if (isNaN(takenBy) || isNaN(me) || takenBy !== me) {
+      // ids = UUID → comparaison en chaîne.
+      const takenBy = inc?.taken_by != null ? String(inc.taken_by) : null;
+      const me = currentUserId != null ? String(currentUserId) : null;
+      if (!takenBy || !me || takenBy !== me) {
         return false;
       }
     }

@@ -37,7 +37,7 @@ export const IncidentDetailPage = () => {
         <div className="incident-workspace">
           {/* On rend le composant détail existant. Il gère déjà useSWR pour charger ses données. */}
           <IncidentDetail 
-            incident={{ id: parseInt(id) }} 
+            incident={{ id }} 
             onBack={handleBack} 
             isLoading={false} 
           />
