@@ -883,11 +883,12 @@ export const IncidentDetail = ({ incident, onBack, isLoading = false }) => {
         }, 1200);
       } else {
         // Si l'incident est déjà pris en charge, OU s'il n'est pas pris en charge mais que l'utilisateur choisit d'être contributeur ou observateur
+        // `user` (l'émetteur) est défini CÔTÉ SERVEUR = utilisateur authentifié.
+        // Ne PAS l'envoyer : un mauvais id (ex. 6) provoquait « 400 Invalid pk ».
         const collaborationData = {
           incident: safeIncident.id,
           role: selfRole === 'contributeur' ? 'contributor' : selfRole === 'leader' ? 'leader' : 'observer',
           motivation: motif,
-          user: currentUserId ? currentUserId : null
         };
 
         const result = await requestCollaborationService(collaborationData);
