@@ -9,7 +9,7 @@ const API_URL = API_URL_BASE;
 // pour l'UI et pour savoir si on est connecté.
 axios.defaults.withCredentials = true;
 
-// Clés de stockage (profil utilisateur uniquement — plus AUCUN token).
+// Clés de stockage (profil + token CSRF — JAMAIS le JWT).
 const STORAGE_KEYS = {
   USER: 'user',
   USER_ID: 'user_id',
@@ -17,13 +17,20 @@ const STORAGE_KEYS = {
   ZONE: 'zone',
   USER_TYPE: 'user_type',
   ORGANISATION: 'organisation',
+  CSRF: 'csrftoken', // valeur (pas un secret) renvoyée par le backend, pour X-CSRFToken
 };
 
-// Lit un cookie (ex. le csrftoken, non-httpOnly, à renvoyer en X-CSRFToken).
+// Lit un cookie (csrftoken en dev same-site ; illisible cross-site → fallback).
 const getCookie = (name) => {
   const match = document.cookie.match(new RegExp('(^|;\\s*)' + name + '=([^;]*)'));
   return match ? decodeURIComponent(match[2]) : null;
 };
+
+// Token CSRF à envoyer en X-CSRFToken : valeur stockée (renvoyée par le backend
+// dans le corps de /login/ ou /get_csrf_token/) en priorité, sinon le cookie
+// (cas same-site / dev). Cross-site, le cookie backend n'est pas lisible ici.
+const getCsrfToken = () =>
+  sessionStorage.getItem(STORAGE_KEYS.CSRF) || getCookie('csrftoken');
 
 export const authService = {
   /**
@@ -44,8 +51,11 @@ export const authService = {
 
       console.log('[AUTH] Réponse login:', authResponse.status, authResponse.data);
 
-      // Le login a posé les cookies httpOnly (access/refresh) + le cookie csrftoken.
-      // On ne stocke AUCUN token côté JS.
+      // Le login a posé les cookies httpOnly (access/refresh). On stocke la valeur
+      // du token CSRF (renvoyée dans le corps) pour l'envoyer en X-CSRFToken.
+      if (authResponse.data?.csrftoken) {
+        sessionStorage.setItem(STORAGE_KEYS.CSRF, authResponse.data.csrftoken);
+      }
 
       // 2. Récupération du profil — le cookie d'accès suffit (withCredentials global).
       const userResponse = await axios.get(`${API_URL}/MapApi/user_retrieve/`);
@@ -223,7 +233,7 @@ export const authService = {
     // Ajoute le token CSRF sur chaque requête (le backend ne le vérifie que sur
     // les méthodes non sûres, mais l'envoyer partout est sans risque).
     instance.interceptors.request.use((config) => {
-      const csrf = getCookie('csrftoken');
+      const csrf = getCsrfToken();
       if (csrf) {
         config.headers['X-CSRFToken'] = csrf;
       }
