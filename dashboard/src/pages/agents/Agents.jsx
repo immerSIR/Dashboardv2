@@ -10,7 +10,7 @@ import { ShimmerTable } from 'react-shimmer-effects';
 import { ROLES, AVATAR_COLORS } from './data/agents';
 import { idSeed } from '../../utils/idSeed';
 import { getOrganisationsService } from '../organisations/service/organisation_service';
-import { getOrganisationMembersService } from './service/members_service';
+import { getAgentsService } from './service/members_service';
 import AgentsContext from './modale/AgentsModalContext';
 import { AgentFormModal, AgentDeleteModal } from './modale';
 import './agents.css';
@@ -29,36 +29,30 @@ const getInitials = (name) =>
 const EMPTY_ARRAY = [];
 
 
-const fetcher = async ([, organisationsList]) => {
-  if (!organisationsList || organisationsList.length === 0) return [];
-  const allMembers = [];
-  for (const org of organisationsList) {
-    try {
-      const data = await getOrganisationMembersService(org.id);
-      const members = data.results || data || [];
-      members.forEach((m) => {
-        let role = 'bureau';
-        if (m.org_role === 'org_admin') role = 'admin';
-        if (m.org_role === 'field_agent') role = 'terrain';
-        if (m.org_role === 'bureau_agent') role = 'bureau';
-        allMembers.push({
-          id: m.id,
-          firstName: m.first_name || '',
-          lastName: m.last_name || '',
-          fullName: `${m.first_name || ''} ${m.last_name || ''}`.trim() || m.email,
-          email: m.email,
-          role,
-          organisationId: org.id,
-          organisationName: org.name,
-          status: 'active',
-          avatarColor: AVATAR_COLORS[idSeed(m.id) % AVATAR_COLORS.length] || '#3AA2DD',
-        });
-      });
-    } catch (err) {
-      console.error(`[Agents] Erreur organisation ${org.id}:`, err);
-    }
-  }
-  return allMembers;
+// Un seul appel : GET /agents/ — le backend filtre selon le rôle (Super Admin =
+// tous les agents ; admin d'org = uniquement ceux de SON organisation). Plus de
+// boucle par organisation (qui renvoyait 403 pour les orgs étrangères).
+const fetcher = async () => {
+  const data = await getAgentsService();
+  const members = data.results || data || [];
+  return members.map((m) => {
+    let role = 'bureau';
+    if (m.org_role === 'org_admin') role = 'admin';
+    if (m.org_role === 'field_agent') role = 'terrain';
+    if (m.org_role === 'bureau_agent') role = 'bureau';
+    return {
+      id: m.id,
+      firstName: m.first_name || '',
+      lastName: m.last_name || '',
+      fullName: `${m.first_name || ''} ${m.last_name || ''}`.trim() || m.email,
+      email: m.email,
+      role,
+      organisationId: m.organisation_member,
+      organisationName: m.organisation_name,
+      status: m.is_active ? 'active' : 'inactive',
+      avatarColor: AVATAR_COLORS[idSeed(m.id) % AVATAR_COLORS.length] || '#3AA2DD',
+    };
+  });
 };
 
 export const Agents = () => {
@@ -80,7 +74,7 @@ export const Agents = () => {
     isLoading: loadingMembers,
     mutate: mutateAgents,
   } = useSWR(
-    organisationsList.length > 0 ? ['agents_list', organisationsList] : null,
+    'agents_list',
     fetcher,
     {
       revalidateOnFocus: false,

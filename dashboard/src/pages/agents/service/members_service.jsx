@@ -19,6 +19,29 @@ export const getOrganisationMembersService = async (organisationId) => {
 };
 
 /**
+ * Récupère la liste des agents visibles par l'utilisateur connecté.
+ * Le backend filtre automatiquement selon le rôle : un Super Admin voit les
+ * agents de TOUTES les organisations ; un admin/membre d'org ne voit que ceux
+ * de SA propre organisation. À utiliser à la place d'une boucle sur
+ * `organisations/<id>/members/` (qui renvoie 403 pour les orgs étrangères).
+ * @param {Object} [params] - Filtres optionnels { search, role, status }
+ * @returns {Promise<Object>} Réponse paginée { count, results }
+ */
+export const getAgentsService = async (params = {}) => {
+    try {
+        const axios = authService.createAuthenticatedAxios();
+        const response = await axios.get(`${API_URL_BASE}/MapApi/agents/`, {
+            params: { page_size: 100, ...params },
+        });
+        console.log('[Members] Agents récupérés:', response.data?.count ?? response.data);
+        return response.data;
+    } catch (error) {
+        console.error('[Members] Erreur récupération agents:', error?.response?.status, error?.response?.data);
+        throw error;
+    }
+};
+
+/**
  * Crée un nouvel agent de terrain dans une organisation
  * @param {number|string} organisationId - ID de l'organisation
  * @param {Object} agentData - Données de l'agent à créer
