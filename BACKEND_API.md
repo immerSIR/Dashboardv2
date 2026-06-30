@@ -282,7 +282,7 @@ Legend — Auth: **none** (public), **Bearer** (any authenticated user), or a sp
 | Method · Path | Auth | Notes |
 |---|---|---|
 | `GET·POST /MapApi/incidents/<id>/tasks/` | Bearer + `IsIncidentLeaderOrContributor` | List / create. Body `{title, start_date, end_date, description?, assigned_to?, state?}`. **`incident` comes from the URL — don't send it** (*2026*: it's read-only; sending nothing avoids the old `400 "incident may not be null"`). **`assigned_to` is optional — omit it or send a valid agent UUID, never a legacy int** (`"6"` → `400 Invalid pk`). Leader-created tasks auto-`is_confirmed`. |
-| `GET·PUT·PATCH·DELETE /MapApi/incidents/<id>/tasks/<pk>/` | read: any collaborator; write: leader | Task RUD. |
+| `GET·PUT·PATCH·DELETE /MapApi/incidents/<id>/tasks/<pk>/` | read: any collaborator; **write (PUT/PATCH/DELETE): leader OR accepted contributor** *(2026 — was leader-only; observers stay read-only)* | Task RUD. **`DELETE` 404 = wrong `incident_id` in the URL** (use the task's own `incident` UUID); a correct-URL contributor delete returns `204`. |
 | `POST /MapApi/incidents/<id>/tasks/<pk>/complete/` | Bearer + **`IsIncidentLeaderOrContributor`** *(2026 — was leader-only)* | multipart `proof_image` and/or `proof_video` (≥1 required) → `state=done`. A **contributor** (the worker) can complete with proof; the leader still controls `is_confirmed`. |
 | `POST /MapApi/incidents/<id>/tasks/<pk>/fail/` | Bearer + **`IsIncidentLeaderOrContributor`** *(2026)* | `{failure_reason}` → `state=failed`. |
 | `POST /MapApi/incidents/<id>/tasks/<pk>/confirm/` | Bearer + `IsIncidentLeader` | Confirms a contributor-created task (counts toward `progress`). |
