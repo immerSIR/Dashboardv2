@@ -316,8 +316,8 @@ Toutes publiques (`permission_classes=()`) ; renvoient des agrégats JSON, pas d
 
 | Méthode · Chemin | Renvoie |
 |---|---|
-| `GET /MapApi/incidentResolved/` | Incidents paginés avec `etat=resolved`. |
-| `GET /MapApi/incidentNotResolved/` | Incidents paginés avec `etat=declared`. |
+| `GET /MapApi/incidentResolved/` **(Bearer)** | Incidents **résolus** paginés (`etat` ∈ `resolved`, `resolved_definitive`) **sauf ceux que mon org gère déjà** *(2026)* — pris en charge **en interne par mon org** OU **signalés par mes agents de terrain** (même ensemble que « Mes interventions »). Plus récents d'abord ; supprimés (soft-delete) exclus. **Auth désormais requise** (filtre relatif à l'org du demandeur) ; auparavant public + `etat=resolved` seulement. |
+| `GET /MapApi/incidentNotResolved/` **(Bearer)** | Incidents **non résolus** paginés — **tous** les états sauf `resolved`/`resolved_definitive` (`declared`, `taken_into_account`, `in_progress`, `in_validation`) **sauf ceux de mon org** (interne par mon org ou signalés par mes agents) *(2026)*. **Correction :** la vue ne renvoyait avant **que `etat=declared`** (il manquait taken/in-progress/in-validation). Plus récents d'abord ; soft-delete exclu ; **auth désormais requise**. |
 | `GET /MapApi/incidentByMonth/` `?month=` | `{status,message,data:[Incident...]}` pour l'année (optionnellement un mois). |
 | `GET /MapApi/incidentByMonth_zone/<zone>` *(sans slash)* | Par mois `{month,total,resolved,unresolved}` pour une zone. |
 | `GET /MapApi/IncidentOnWeek/` | Par jour `{day,total,resolved,unresolved}` pour la dernière semaine. |

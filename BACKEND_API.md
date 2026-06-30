@@ -316,8 +316,8 @@ All public (`permission_classes=()`); return JSON aggregates, not paginated list
 
 | Method · Path | Returns |
 |---|---|
-| `GET /MapApi/incidentResolved/` | Paginated incidents with `etat=resolved`. |
-| `GET /MapApi/incidentNotResolved/` | Paginated incidents with `etat=declared`. |
+| `GET /MapApi/incidentResolved/` **(Bearer)** | Paginated **resolved** incidents (`etat` ∈ `resolved`, `resolved_definitive`) **excluding the ones my org already handles** *(2026)* — i.e. taken in charge **internally by my org** OR **reported by my field agents** (same set as "Mes interventions"). Newest-first; soft-deleted excluded. **Now requires auth** (filter is relative to the caller's org); was public + `etat=resolved` only. |
+| `GET /MapApi/incidentNotResolved/` **(Bearer)** | Paginated **non-resolved** incidents — **all** states except `resolved`/`resolved_definitive` (`declared`, `taken_into_account`, `in_progress`, `in_validation`) **excluding my org's own** (internal-by-my-org or reported-by-my-agents) *(2026)*. **Fix:** previously returned **only `etat=declared`** (missing taken/in-progress/in-validation). Newest-first; soft-deleted excluded; **now requires auth**. |
 | `GET /MapApi/incidentByMonth/` `?month=` | `{status,message,data:[Incident...]}` for the year (optionally a month). |
 | `GET /MapApi/incidentByMonth_zone/<zone>` *(no slash)* | Per-month `{month,total,resolved,unresolved}` for a zone. |
 | `GET /MapApi/IncidentOnWeek/` | Per-day `{day,total,resolved,unresolved}` for the last week. |
