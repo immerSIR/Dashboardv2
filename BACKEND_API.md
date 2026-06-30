@@ -198,9 +198,10 @@ The collaboration permissions (`permissions.py`) resolve the **leader** of an in
 | Permission | Allows |
 |---|---|
 | `IsIncidentLeader` | leader only |
-| `IsIncidentCollaborator` | any `accepted` collaborator (leader/contributor/observer) or `taken_by` |
-| `IsIncidentContributor` | accepted `contributor` (read open to all collaborators) |
-| `IsIncidentLeaderOrContributor` | leader or accepted contributor (used for tasks/suggestions create) |
+| `IsIncidentCollaborator` | any `accepted` collaborator (leader/contributor/observer) or `taken_by` — **+ in `internal` mode, any member of the owner org (`taken_by`'s org)** *(2026)* |
+| `IsIncidentContributor` | accepted `contributor` (read open to all collaborators) — **+ internal-mode owner-org members** *(2026)* |
+| `IsIncidentLeaderOrContributor` | leader or accepted contributor (used for tasks/suggestions create) — **+ internal-mode owner-org members** *(2026)* |
+| **Internal-mode visibility** *(2026)* | When `take_in_charge_mode='internal'`, **every member of the org that took it in charge** (admin **and bureau agents**) is treated as a collaborator on that incident — so they can view/work its sub-resources (tasks, suggestions, discussion), not only the single `taken_by` user. Fixes bureau agents getting `403/404` on their own org's internal incidents. **Leader-only lifecycle actions (confirm task, declare/validate resolution) stay with `taken_by`.** |
 | `IsIncidentLeaderOrReadOnlyCollaborator` | read = any collaborator; write = leader |
 | `IsSuperAdmin` | `is_superuser` (trash, bulk-restore, force-delete, prediction retry) |
 | `IsSuperAdminOrOrgOwnIncident` | super admin → any incident; org member → only incidents reported/taken by their org (used for delete) |
@@ -229,7 +230,7 @@ Legend — Auth: **none** (public), **Bearer** (any authenticated user), or a sp
 | `GET /MapApi/organisations/<pk>/detail/` | none | Org + `stats`: `{member_count, field_agents_count, bureau_agents_count, admins_count, incident_count, resolved_incident_count}`. |
 | `GET /MapApi/organisations/<pk>/members/` | Bearer + org_admin/bureau or staff | List members (`OrganisationMemberSerializer`). |
 | `POST /MapApi/organisations/<pk>/members/add/` | Bearer + org_admin/bureau or staff | `{user_id, org_role}` → attaches existing user. New field agents return one-time `initial_pin`. |
-| `PATCH·DELETE /MapApi/organisations/<pk>/members/<user_id>/` | Bearer + org_admin/bureau or staff | Edit (`email, first_name, last_name, phone, org_role`) / remove member. **Anti-lockout: an org admin can't remove/downgrade the org's last active admin (`400`); a Super Admin can override it.** |
+| `PATCH·DELETE /MapApi/organisations/<pk>/members/<user_id>/` | Bearer | Edit (`email, first_name, last_name, phone, org_role`) / remove member. **PATCH** = org admin of that org or super admin. **DELETE** = org admin / super admin (any member) **or a bureau agent of that org — but a bureau agent can only delete a `field_agent`** *(2026)* (deleting an admin/bureau → `403 "Un agent de bureau ne peut supprimer qu'un agent de terrain."`). **Anti-lockout: can't remove/downgrade the org's last active admin (`400`); a Super Admin can override it.** |
 | `POST /MapApi/organisations/<pk>/agents/create/` | Bearer + org_admin/bureau or staff | Create a field agent in one call `{first_name,last_name,email,phone,address?}` → returns `initial_pin`, `must_change_pin`, emails credentials. |
 | `POST /MapApi/organisations/<pk>/staff/create/` | Bearer + org_admin or staff | Create staff `{first_name,last_name,email,org_role(org_admin|bureau_agent),phone?,address?}` → returns **`temp_password`** (display it so the admin can share it — email delivery isn't guaranteed), plus `email_sent`, `must_change_password:true`. |
 | `GET /MapApi/agents/` *(2026)* | Bearer | Agents list, **newest-first**, paginated. **Role-scoped: a Super Admin sees every org's agents; an org admin/member sees only their own org's agents** (no cross-org `403`). Filters: `?search=` (name/email/org), `?role=org_admin\|bureau_agent\|field_agent`, `?status=active\|inactive`. Rows = `OrganisationMemberSerializer`. **Use this instead of looping `organisations/<id>/members/` per org** — that per-org route `403`s for orgs you don't belong to. |
