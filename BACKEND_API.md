@@ -337,7 +337,7 @@ All public (`permission_classes=()`); return JSON aggregates, not paginated list
 | Method · Path | Auth | Notes |
 |---|---|---|
 | `GET /MapApi/notifications/` | Bearer | **All** the current user's notifications, **newest-first**, paginated (20/page; `?page=&page_size=`). Each has a **`link`** (redirect target, see §6.14). Filter `?read=true\|false` (`?read=false` → `count` = number unread). |
-| `GET /MapApi/activity-feed/` *(2026)* | Bearer | Platform activity **outside the user's own org** (who took/resolved incidents, etc.), newest-first, paginated. Items: `{action, user_name, organisation_name, created_at, timeStamp}`. (Sourced from `UserAction`: incident actions **+ collaboration requests/accept/decline**. Reports/AI can still be added.) |
+| `GET /MapApi/activity-feed/` *(2026)* | Bearer | Platform activity **outside the user's own org** (who took/resolved incidents, etc.), newest-first, paginated. Items: `{id, action, user, user_name, organisation_name, created_at, timeStamp}`. **`action`** is a French verb phrase **without the actor and with the incident title** *(2026 — previously some were English and showed raw incident UUIDs)*, e.g. *"a pris en charge l'incident «…» en mode interne."* — render as `{user_name or organisation_name} {action}`. Sourced from `UserAction` (incident actions + collaboration requests/accept/decline). **Real-time:** also pushed live via `wss://<api>/ws/activity-feed/` *(2026)* — see WebSocket table. |
 | `GET /MapApi/user_action/` | Bearer | Current user's action log. |
 
 ### 6.11 Trash & bulk (super admin)
@@ -380,6 +380,7 @@ Django Channels over the same host (`wss://` in prod, `ws://` local). **Auth = t
 | `wss://<api>/ws/incidents/<id>/discussion/` | `{event:'discussion_message', id, incident, collaboration, sender, message, created_at}` — new discussion messages on the incident. |
 | `wss://<api>/ws/incidents/<id>/tasks/` | `{event:'task_created'|'task_updated', id, incident, title, state, assigned_to, updated_at}` — task changes on the incident. **Also `{event:'task_deleted', id, incident}`** *(2026)* when a task is removed (so the card disappears live, not only on refetch). |
 | `wss://<api>/ws/collaborations/` *(2026)* | `{event:'collaboration_created'|'collaboration_updated', id, incident, status, role, sender, created_at}` — the connected user's collaborations in real time, pushed to both the **sender** and the **incident leader** (who receives requests). Subscribe on the collaboration tab/requests page for instant updates. |
+| `wss://<api>/ws/activity-feed/` *(2026)* | `{event:'activity', id, action, user, user_name, organisation_name, organisation_id, created_at, timeStamp}` — platform activity feed in real time. **Server-side scoped exactly like the REST `GET /activity-feed/`**: each connected user only receives activity from **other** organisations (their own org's actions are filtered out). Prepend new items to the feed on receipt. |
 
 Frontend helper: `src/hooks/useWebSocket.js` (auto-reconnect). Used in `Header` (notifications) and `CollaborationDetail` (discussion + tasks) to trigger an instant refresh; HTTP polling remains as a fallback.
 
