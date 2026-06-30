@@ -307,7 +307,7 @@ Legend — Auth: **none** (public), **Bearer** (any authenticated user), or a sp
 | `GET /MapApi/agent/assigned-incidents/` | Bearer | Assignments for the current **field agent** (GET only). |
 | `GET /MapApi/incidents/<id>/reports/` *(2026)* | Bearer | All agent reports for an incident (`Rapport` via FK **or** M2M), each `{id, details, type, statut, date_livraison, disponible, file, created_at, author:{id,name,email,organisation_id,organisation_name}}`. Serves the "Mes interventions" reports view **and** the collaboration-detail reports column (reports of each org working on the incident). |
 | `GET·POST /MapApi/field-reports/` | Bearer (POST: field agents on assigned incidents) | List (role-scoped) / create a field visit report. multipart `photo`; sets matching assignment to `reported`. |
-| `GET·POST /MapApi/discussion/<incident_id>/` | Bearer + accepted collaborator | Group chat per incident. POST multipart `{message?, audio?, attachment?, recipient?}` (≥1 of message/audio/attachment). Blocked once incident `resolved`. |
+| `GET·POST /MapApi/discussion/<incident_id>/` | Bearer + accepted collaborator | Group chat per incident. GET: no params = full message list (array, chronological). **Cursor pagination** *(2026)*: **`?limit=N`** (1–100) = the latest N messages, returned as **`{messages:[…], has_more, next_before}`**; for older messages on scroll-up, call again with **`?before=<oldest loaded message id>`** (`+limit`). Each message has an **`id`** (the cursor). POST multipart `{message?, audio?, attachment?, recipient?}` (≥1 of message/audio/attachment). Blocked once incident `resolved`. |
 
 ### 6.8 Incident stats (dashboards/charts)
 
