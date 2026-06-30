@@ -303,7 +303,7 @@ Legend — Auth: **none** (public), **Bearer** (any authenticated user), or a sp
 
 | Method · Path | Auth | Notes |
 |---|---|---|
-| `GET·POST /MapApi/incidents/<id>/assignments/` | Bearer + manage (staff or org_admin/bureau on own incident) | List / **assign a field agent** (`{agent, deadline, ...}`). POST emails the agent. |
+| `GET·POST /MapApi/incidents/<id>/assignments/` | Bearer | List / **assign a field agent** (`{agent, deadline, ...}` — `agent` must be a `field_agent`). POST emails the agent. **Who can assign** *(2026 — bureau agents now allowed; previously org_admin-only → `403`)*: staff/super admin, OR **org_admin OR bureau agent** when the incident is **their org's** (reported by their org or taken in charge by their org) **OR a public incident not yet taken in charge** (`taken_by=null` — any org may dispatch an agent to investigate a citizen report). Once an org takes an incident in charge, only that org can assign. |
 | `GET·PUT·PATCH·DELETE /MapApi/incidents/<id>/assignments/<pk>/` | Bearer + manage | Assignment RUD. |
 | `GET /MapApi/agent/assigned-incidents/` | Bearer | Assignments for the current **field agent** (GET only). |
 | `GET /MapApi/incidents/<id>/reports/` *(2026)* | Bearer | All agent reports for an incident (`Rapport` via FK **or** M2M), each `{id, details, type, statut, date_livraison, disponible, file, created_at, author:{id,name,email,organisation_id,organisation_name}}`. Serves the "Mes interventions" reports view **and** the collaboration-detail reports column (reports of each org working on the incident). |

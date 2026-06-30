@@ -303,7 +303,7 @@ Légende — Auth : **aucune** (public), **Bearer** (tout utilisateur authentifi
 
 | Méthode · Chemin | Auth | Notes |
 |---|---|---|
-| `GET·POST /MapApi/incidents/<id>/assignments/` | Bearer + gestion (staff ou org_admin/bureau sur son incident) | Liste / **assigne un agent de terrain** (`{agent, deadline, ...}`). POST envoie un email à l'agent. |
+| `GET·POST /MapApi/incidents/<id>/assignments/` | Bearer | Liste / **assigne un agent de terrain** (`{agent, deadline, ...}` — `agent` doit être un `field_agent`). POST envoie un email à l'agent. **Qui peut assigner** *(2026 — les agents de bureau sont désormais autorisés ; auparavant réservé à l'admin d'org → `403`)* : staff/super admin, OU **admin d'org OU agent de bureau** quand l'incident est **celui de son org** (signalé par son org ou pris en charge par son org) **OU un incident public pas encore pris en charge** (`taken_by=null` — n'importe quelle org peut y dépêcher un agent pour investiguer un signalement citoyen). Dès qu'une org prend l'incident en charge, seule elle peut assigner. |
 | `GET·PUT·PATCH·DELETE /MapApi/incidents/<id>/assignments/<pk>/` | Bearer + gestion | RUD d'assignation. |
 | `GET /MapApi/agent/assigned-incidents/` | Bearer | Assignations de l'**agent de terrain** courant (GET seulement). |
 | `GET /MapApi/incidents/<id>/reports/` *(2026)* | Bearer | Tous les rapports d'agents d'un incident (`Rapport` via FK **ou** M2M), chacun `{id, details, type, statut, date_livraison, disponible, file, created_at, author:{id,name,email,organisation_id,organisation_name}}`. Sert la vue rapports de « Mes interventions » **et** la colonne rapports du détail de collaboration (rapports de chaque org travaillant sur l'incident). |
