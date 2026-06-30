@@ -283,8 +283,8 @@ Legend — Auth: **none** (public), **Bearer** (any authenticated user), or a sp
 |---|---|---|
 | `GET·POST /MapApi/incidents/<id>/tasks/` | Bearer + `IsIncidentLeaderOrContributor` | List / create. Body `{title, start_date, end_date, description?, assigned_to?, state?}`. **`incident` comes from the URL — don't send it** (*2026*: it's read-only; sending nothing avoids the old `400 "incident may not be null"`). **`assigned_to` is optional — omit it or send a valid agent UUID, never a legacy int** (`"6"` → `400 Invalid pk`). Leader-created tasks auto-`is_confirmed`. |
 | `GET·PUT·PATCH·DELETE /MapApi/incidents/<id>/tasks/<pk>/` | read: any collaborator; write: leader | Task RUD. |
-| `POST /MapApi/incidents/<id>/tasks/<pk>/complete/` | Bearer + `IsIncidentLeader` | multipart `proof_image` and/or `proof_video` (≥1 required) → `state=done`. |
-| `POST /MapApi/incidents/<id>/tasks/<pk>/fail/` | Bearer + `IsIncidentLeader` | `{failure_reason}` → `state=failed`. |
+| `POST /MapApi/incidents/<id>/tasks/<pk>/complete/` | Bearer + **`IsIncidentLeaderOrContributor`** *(2026 — was leader-only)* | multipart `proof_image` and/or `proof_video` (≥1 required) → `state=done`. A **contributor** (the worker) can complete with proof; the leader still controls `is_confirmed`. |
+| `POST /MapApi/incidents/<id>/tasks/<pk>/fail/` | Bearer + **`IsIncidentLeaderOrContributor`** *(2026)* | `{failure_reason}` → `state=failed`. |
 | `POST /MapApi/incidents/<id>/tasks/<pk>/confirm/` | Bearer + `IsIncidentLeader` | Confirms a contributor-created task (counts toward `progress`). |
 
 ### 6.6 Partner suggestions (per incident)
@@ -378,7 +378,7 @@ Django Channels over the same host (`wss://` in prod, `ws://` local). **Auth = t
 |---|---|
 | `wss://<api>/ws/notifications/` | `{event:'notification', id, message, read, colaboration, incident, link, created_at}` — the connected user's notifications in real time. **`link`** = `{type:'incident'\|'collaboration', incident_id, collaboration_id?, url}` or `null` — where to redirect when the user clicks the notification (same `link` field is on the REST `GET /notifications/`). |
 | `wss://<api>/ws/incidents/<id>/discussion/` | `{event:'discussion_message', id, incident, collaboration, sender, message, created_at}` — new discussion messages on the incident. |
-| `wss://<api>/ws/incidents/<id>/tasks/` | `{event:'task_created'|'task_updated', id, incident, title, state, assigned_to, updated_at}` — task changes on the incident. |
+| `wss://<api>/ws/incidents/<id>/tasks/` | `{event:'task_created'|'task_updated', id, incident, title, state, assigned_to, updated_at}` — task changes on the incident. **Also `{event:'task_deleted', id, incident}`** *(2026)* when a task is removed (so the card disappears live, not only on refetch). |
 | `wss://<api>/ws/collaborations/` *(2026)* | `{event:'collaboration_created'|'collaboration_updated', id, incident, status, role, sender, created_at}` — the connected user's collaborations in real time, pushed to both the **sender** and the **incident leader** (who receives requests). Subscribe on the collaboration tab/requests page for instant updates. |
 
 Frontend helper: `src/hooks/useWebSocket.js` (auto-reconnect). Used in `Header` (notifications) and `CollaborationDetail` (discussion + tasks) to trigger an instant refresh; HTTP polling remains as a fallback.
