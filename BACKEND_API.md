@@ -9,7 +9,7 @@ This documents the Django REST backend that powers this dashboard. Source repo: 
 > - **Swagger UI:** `<backend>/MapApi/schema/swagger-ui/` — click **Authorize**, paste your `access` token (from `POST /MapApi/login/`), and call any endpoint.
 > - **ReDoc:** `<backend>/MapApi/schema/redoc/` · **Raw schema:** `<backend>/MapApi/api/schema/`
 >
-> On our deployment `<backend>` = `https://backend-production-0726b.up.railway.app`. Every operation is tagged by domain (Incidents, Collaboration, Organisations, Auth…) with real request/response bodies, params, and error codes. This Markdown file remains the curated companion (rationale, gotchas, discrepancies); Swagger is the exhaustive machine-generated reference.
+> On our deployment `<backend>` = `https://api.map-action.com`. Every operation is tagged by domain (Incidents, Collaboration, Organisations, Auth…) with real request/response bodies, params, and error codes. This Markdown file remains the curated companion (rationale, gotchas, discrepancies); Swagger is the exhaustive machine-generated reference.
 
 > 🇫🇷 A French version exists: [`BACKEND_API.fr.md`](./BACKEND_API.fr.md). Keep both files in sync.
 
